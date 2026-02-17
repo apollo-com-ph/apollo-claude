@@ -57,6 +57,11 @@ cd collector && docker compose up -d
 OTEL_METRICS_EXPORTER=console apollo-claude --version
 ```
 
+## Commit Rules
+
+- Never add `Co-Authored-By` or any Claude/AI attribution to commit messages.
+- Before committing, ensure CLAUDE.md and README.md are consistent with the current state of the code (key files, config variables, architecture, conventions, etc.).
+
 ## Conventions
 
 - `bin/apollo-claude` uses `set -euo pipefail` and bash. `install.sh` uses `set -eu` and POSIX sh.

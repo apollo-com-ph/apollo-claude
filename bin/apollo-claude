@@ -70,9 +70,10 @@ _test_token() {
     else
         return 0  # can't test, assume OK
     fi
-    # 401/403 = bad token; 000 = network error (skip validation); anything else = auth OK
+    # 401/403 = bad token; 000 = network error; anything else = auth OK
     case "${status}" in
         401|403) return 1 ;;
+        000)     return 2 ;;
         *)       return 0 ;;
     esac
 }
@@ -108,8 +109,12 @@ EOF
                 echo "  Token cannot be empty." >&2
                 continue
             fi
-            if _test_token "${APOLLO_OTEL_SERVER}" "${APOLLO_OTEL_TOKEN}"; then
+            _test_token "${APOLLO_OTEL_SERVER}" "${APOLLO_OTEL_TOKEN}"
+            local _rc=$?
+            if [[ ${_rc} -eq 0 ]]; then
                 break
+            elif [[ ${_rc} -eq 2 ]]; then
+                echo "  Could not reach ${APOLLO_OTEL_SERVER} — check the server URL and try again." >&2
             else
                 echo "  Token rejected by ${APOLLO_OTEL_SERVER} (HTTP 401). Please check and try again." >&2
             fi
