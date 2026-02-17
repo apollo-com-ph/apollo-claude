@@ -33,7 +33,8 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Prometh
 - `bin/apollo-claude` — the wrapper script (bash). This is what gets installed to `~/.local/bin/apollo-claude`.
 - `install.sh` — one-liner installer. Uses POSIX `sh` (not bash) for portability. Checks all wrapper dependencies (bash, claude, curl/wget, coreutils, git) before installing. Validates the downloaded wrapper (shebang check + `bash -n` syntax check) before declaring success.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
-- `collector/` — self-hosted OTel backend (docker-compose stack). Defense-in-depth filtering strips prompt/completion content at the collector level.
+- `collector/` — self-hosted OTel backend (docker-compose stack, nginx reverse proxy). Defense-in-depth filtering strips prompt/completion content at the collector level.
+- `collector/nginx-site.conf` — nginx site config template for TLS termination and reverse proxy.
 - `README.md` — developer-facing: install, usage, troubleshooting.
 - `SETUP.md` — OTel collector deployment guide.
 
