@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VERSION_FILE="${REPO_ROOT}/VERSION"
+WRAPPER="${REPO_ROOT}/bin/apollo-claude"
+
+current="$(cat "${VERSION_FILE}" | tr -d '[:space:]')"
+next=$(( current + 1 ))
+
+# Update VERSION file
+printf '%d\n' "${next}" > "${VERSION_FILE}"
+
+# Update APOLLO_CLAUDE_VERSION in the wrapper
+sed -i "s/^APOLLO_CLAUDE_VERSION=.*/APOLLO_CLAUDE_VERSION=${next}/" "${WRAPPER}"
+
+# Verify they match
+wrapper_ver="$(grep -m1 '^APOLLO_CLAUDE_VERSION=' "${WRAPPER}" | cut -d= -f2)"
+if [[ "${wrapper_ver}" != "${next}" ]]; then
+    echo "error: version mismatch after update" >&2
+    exit 1
+fi
+
+# Syntax check
+if ! bash -n "${WRAPPER}"; then
+    echo "error: wrapper failed syntax check" >&2
+    exit 1
+fi
+
+git -C "${REPO_ROOT}" add "${VERSION_FILE}" "${WRAPPER}"
+git -C "${REPO_ROOT}" commit -m "Release v${next}"
+git -C "${REPO_ROOT}" push
+
+echo "Released v${next} (was v${current})"
