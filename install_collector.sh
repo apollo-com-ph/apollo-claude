@@ -32,9 +32,9 @@ die()   { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 prompt_value() {
     local prompt="$1" default="${2:-}" value
     if [ -n "$default" ]; then
-        printf '\033[1;34m  ?\033[0m %s [%s]: ' "$prompt" "$default"
+        printf '\033[1;34m  ?\033[0m %s [%s]: ' "$prompt" "$default" >&2
     else
-        printf '\033[1;34m  ?\033[0m %s: ' "$prompt"
+        printf '\033[1;34m  ?\033[0m %s: ' "$prompt" >&2
     fi
     read -r value
     printf '%s' "${value:-$default}"
@@ -43,17 +43,17 @@ prompt_value() {
 prompt_secret() {
     local prompt="$1" default="${2:-}" value
     if [ -n "$default" ]; then
-        printf '\033[1;34m  ?\033[0m %s [%s]: ' "$prompt" "(generated)"
+        printf '\033[1;34m  ?\033[0m %s [%s]: ' "$prompt" "(generated)" >&2
     else
-        printf '\033[1;34m  ?\033[0m %s: ' "$prompt"
+        printf '\033[1;34m  ?\033[0m %s: ' "$prompt" >&2
     fi
     read -rs value
-    printf '\n'
+    printf '\n' >&2
     printf '%s' "${value:-$default}"
 }
 
 generate_password() {
-    head -c 12 /dev/urandom | base64 | tr -d '/+=' | head -c 16
+    head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 16
 }
 
 # ---------------------------------------------------------------------------
@@ -162,16 +162,7 @@ if ! groups "$USER" | grep -qw docker; then
     ok "Added $USER to docker group"
 fi
 
-# Use sg to run subsequent docker commands with the docker group
-# without requiring re-login
-_docker() {
-    if [ "$_need_group" = true ]; then
-        sg docker -c "docker $*"
-    else
-        docker "$@"
-    fi
-}
-
+# Use sg to run docker compose with the docker group without requiring re-login
 _docker_compose() {
     if [ "$_need_group" = true ]; then
         sg docker -c "docker compose $*"
@@ -243,10 +234,13 @@ ok "Grafana .env written"
 # Ensure bind mount target exists
 mkdir -p grafana/provisioning
 
-# Generate htpasswd entry for first developer
-htpasswd -nbB "$DEV_USER" "$DEV_TOKEN" >> htpasswd
-
-ok "Developer $DEV_USER added to htpasswd"
+# Generate htpasswd entry for first developer (skip if already present)
+if grep -q "^${DEV_USER}:" htpasswd 2>/dev/null; then
+    ok "Developer $DEV_USER already in htpasswd"
+else
+    htpasswd -nbB "$DEV_USER" "$DEV_TOKEN" >> htpasswd
+    ok "Developer $DEV_USER added to htpasswd"
+fi
 
 # Start the stack
 _docker_compose up -d
@@ -299,12 +293,11 @@ fi
 
 info "Setting up TLS with Let's Encrypt..."
 
-_certbot_cmd="sudo certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email -d $DOMAIN"
-
-if eval "$_certbot_cmd"; then
+if sudo certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email -d "$DOMAIN"; then
     ok "TLS certificates obtained"
 else
-    warn "Certbot failed — you can retry manually: $_certbot_cmd"
+    warn "Certbot failed — you can retry manually:"
+    warn "  sudo certbot --nginx -d $DOMAIN"
 fi
 
 # Verify certbot timer
@@ -321,15 +314,11 @@ fi
 printf '\n'
 printf '\033[1;32m✓ Collector stack deployed successfully!\033[0m\n'
 printf '\n'
-printf '  ┌─────────────────────────────────────────────────────────────────┐\n'
-printf '  │                         Summary                                │\n'
-printf '  ├─────────────────────────────────────────────────────────────────┤\n'
-printf '  │  OTel endpoint:   https://%s/otel\n' "$DOMAIN"
-printf '  │  Grafana URL:     https://%s/grafana\n' "$DOMAIN"
-printf '  │  Grafana login:   admin / %s\n' "$GRAFANA_ADMIN_PASSWORD"
-printf '  │  Install dir:     %s/collector\n' "$INSTALL_DIR"
-printf '  │  First developer: %s\n' "$DEV_USER"
-printf '  └─────────────────────────────────────────────────────────────────┘\n'
+printf '  OTel endpoint:   https://%s/otel\n' "$DOMAIN"
+printf '  Grafana URL:     https://%s/grafana\n' "$DOMAIN"
+printf '  Grafana login:   admin / %s\n' "$GRAFANA_ADMIN_PASSWORD"
+printf '  Install dir:     %s/collector\n' "$INSTALL_DIR"
+printf '  First developer: %s\n' "$DEV_USER"
 printf '\n'
 printf 'Next steps:\n'
 printf '\n'
