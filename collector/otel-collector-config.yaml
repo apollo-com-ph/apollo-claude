@@ -18,6 +18,7 @@ receivers:
     protocols:
       http:
         endpoint: "0.0.0.0:4318"
+        include_metadata: true
         auth:
           authenticator: basicauth/server
 
@@ -33,6 +34,14 @@ processors:
       - key: service.name
         value: claude-code
         action: upsert
+
+  # Extract X-Apollo-Repository header into a resource attribute (IDE plugin path).
+  # action: insert means it's a no-op if repository is already set (CLI wrapper path).
+  resource/repo-from-header:
+    attributes:
+      - key: repository
+        from_context: metadata.x-apollo-repository
+        action: insert
 
   # Batch for efficiency
   batch:
@@ -86,12 +95,12 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resource, batch]
+      processors: [memory_limiter, resource/repo-from-header, resource, batch]
       exporters: [prometheus]
 
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resource, attributes, batch]
+      processors: [memory_limiter, resource/repo-from-header, resource, attributes, batch]
       exporters: [file]
 
   telemetry:

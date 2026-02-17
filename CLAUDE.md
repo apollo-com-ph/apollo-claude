@@ -24,8 +24,10 @@ Global OTEL path (install_otel.sh):
   install_otel.sh configures ~/.claude/settings.json once
     → env vars injected into all Claude Code sessions (CLI, VS Code, JetBrains)
     → otelHeadersHelper points to ~/.apollo-claude/otel-headers.sh
-    → otel-headers.sh reads ~/.apollo-claude/config, outputs JSON auth headers
-    → Claude Code calls the helper at startup + every ~29 min
+    → otel-headers.sh reads ~/.apollo-claude/config, detects git repo from CWD,
+      outputs {"Authorization": "Basic ...", "X-Apollo-Repository": "org/repo"}
+    → Claude Code attaches headers to OTLP requests at startup + every ~29 min
+    → OTel Collector extracts X-Apollo-Repository → repository resource attribute
 ```
 
 **Auth isolation:** `CLAUDE_CONFIG_DIR` is set to `~/.apollo-claude/`, so Claude's auth tokens (`.credentials.json`) are stored separately from `~/.claude/`. This prevents Apollo's subscription from leaking to plain `claude` usage.
@@ -41,7 +43,7 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Prometh
 - `bin/apollo-claude` — the wrapper script (bash). This is what gets installed to `~/.local/bin/apollo-claude`.
 - `install.sh` — one-liner installer for the CLI wrapper. Uses POSIX `sh` (not bash) for portability. Checks all wrapper dependencies (bash, claude, curl/wget, coreutils, git) before installing. Validates the downloaded wrapper (shebang check + `bash -n` syntax check) before declaring success.
 - `install_otel.sh` — one-liner installer for global OTEL telemetry (IDE plugins + bare `claude`). Uses POSIX `sh`. Requires `jq` for safe JSON merge into `~/.claude/settings.json`. Creates `~/.apollo-claude/otel-headers.sh` auth helper. Shares `~/.apollo-claude/config` with the CLI wrapper.
-- `~/.apollo-claude/otel-headers.sh` — runtime-generated bash script (created by `install_otel.sh`). Reads config, outputs `{"Authorization": "Basic <base64>"}` JSON. Called by Claude Code's `otelHeadersHelper` setting at startup + every ~29 min.
+- `~/.apollo-claude/otel-headers.sh` — runtime-generated bash script (created by `install_otel.sh`). Reads config, detects git repo from CWD (same logic as the CLI wrapper), and outputs `{"Authorization": "Basic <base64>", "X-Apollo-Repository": "org/repo"}` JSON. Called by Claude Code's `otelHeadersHelper` setting at startup + every ~29 min.
 - `install_collector.sh` — automated collector stack installer (bash, Ubuntu-only). Handles OS validation, packages, Docker, UFW, repo clone, nginx, TLS, and first developer provisioning in one script.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 - `collector/` — self-hosted OTel backend (docker-compose stack, nginx reverse proxy). Defense-in-depth filtering strips prompt/completion content at the collector level.

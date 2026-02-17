@@ -107,14 +107,12 @@ After running, telemetry is active for:
 - **JetBrains** (Claude Code plugin)
 - **CLI** (bare `claude` command)
 
-**Limitation:** Global OTEL telemetry does not include per-repo tagging (the `repository` attribute). For per-repo metrics, use the `apollo-claude` CLI wrapper. You can run both installers for full coverage.
-
 ### Two install paths
 
 | Path | Command | Telemetry coverage |
 |------|---------|-------------------|
-| CLI wrapper | `install.sh` | `apollo-claude` CLI only (includes per-repo tagging) |
-| Global OTEL | `install_otel.sh` | All Claude Code usage: CLI, VS Code, JetBrains (no per-repo tagging) |
+| CLI wrapper | `install.sh` | `apollo-claude` CLI only (per-repo tagging via `OTEL_RESOURCE_ATTRIBUTES`) |
+| Global OTEL | `install_otel.sh` | All Claude Code usage: CLI, VS Code, JetBrains (per-repo tagging via `X-Apollo-Repository` header, refreshed every ~29 min) |
 
 Both share `~/.apollo-claude/config` for credentials. A dev who wants full coverage can run both.
 

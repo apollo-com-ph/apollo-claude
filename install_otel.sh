@@ -236,7 +236,27 @@ if [[ -z "${APOLLO_USER}" ]] || [[ -z "${APOLLO_OTEL_TOKEN}" ]]; then
 fi
 
 _basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64)"
-printf '{"Authorization": "Basic %s"}\n' "${_basic}"
+
+# --- Repo detection (best-effort, never fails the script) ---
+_repo=""
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree &>/dev/null; then
+    _remote_url="$(git remote get-url origin 2>/dev/null || true)"
+    if [[ -n "${_remote_url}" ]]; then
+        _repo="$(echo "${_remote_url}" | sed -E 's|.*[:/]([^/]+/[^/]+?)(\.git)?$|\1|')"
+    fi
+    if [[ -z "${_repo}" ]]; then
+        _git_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        _repo="$(basename "${_git_root:-${PWD}}")"
+    fi
+else
+    _repo="$(basename "${PWD}")"
+fi
+
+if [[ -n "${_repo}" ]]; then
+    printf '{"Authorization": "Basic %s", "X-Apollo-Repository": "%s"}\n' "${_basic}" "${_repo}"
+else
+    printf '{"Authorization": "Basic %s"}\n' "${_basic}"
+fi
 HELPEREOF
 
 chmod +x "${HEADERS_HELPER}"
@@ -316,8 +336,8 @@ printf '  • CLI (bare claude command)\n\n'
 printf 'Config:   %s\n' "${CONFIG_FILE}"
 printf 'Helper:   %s\n' "${HEADERS_HELPER}"
 printf 'Settings: %s\n\n' "${CLAUDE_SETTINGS}"
-printf 'Note: Per-repo tagging is not available in global mode.\n'
-printf '      For per-repo metrics, use the apollo-claude CLI wrapper.\n\n'
+printf 'Repo detection is active: the headers helper detects the git repo from CWD\n'
+printf 'and sends it as X-Apollo-Repository (refreshed at startup + every ~29 min).\n\n'
 printf 'To uninstall (removes OTEL settings, keeps other settings.json entries):\n\n'
 printf "  rm -f %s\n" "${HEADERS_HELPER}"
 printf "  jq 'del(.otelHeadersHelper) | if .env then .env |= del("
