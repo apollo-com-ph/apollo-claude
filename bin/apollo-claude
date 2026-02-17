@@ -15,6 +15,16 @@ CONFIG_FILE="${CONFIG_DIR}/config"
 export CLAUDE_CONFIG_DIR="${CONFIG_DIR}"
 
 # ---------------------------------------------------------------------------
+# Flags that don't need config
+# ---------------------------------------------------------------------------
+
+# Handle --wrapper-version flag
+if [[ "${1:-}" == "--wrapper-version" ]]; then
+    echo "apollo-claude version ${APOLLO_CLAUDE_VERSION}"
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # Load config
 # ---------------------------------------------------------------------------
 
@@ -100,6 +110,10 @@ EOF
         _default_user="$(git config user.email 2>/dev/null || echo "${USER:-}")"
         read -rp "  APOLLO_USER (your official email${_default_user:+, default: ${_default_user}}): " APOLLO_USER
         APOLLO_USER="${APOLLO_USER:-${_default_user}}"
+        if [[ -z "${APOLLO_USER}" ]]; then
+            echo "apollo-claude: APOLLO_USER is required. Re-run apollo-claude to try again." >&2
+            exit 1
+        fi
         while true; do
             read -rp "  APOLLO_OTEL_SERVER (default: https://dev-ai.apollotech.co/otel): " APOLLO_OTEL_SERVER
             APOLLO_OTEL_SERVER="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co/otel}"
@@ -118,11 +132,6 @@ EOF
             fi
         done
         echo ""
-
-        if [[ -z "${APOLLO_USER}" ]]; then
-            echo "apollo-claude: credentials are required. Re-run apollo-claude to try again." >&2
-            exit 1
-        fi
 
         mkdir -p "${CONFIG_DIR}"
         cat > "${CONFIG_FILE}" <<EOF
@@ -261,12 +270,6 @@ _apollo_update_check() {
     return 0
 }
 
-# Handle --wrapper-version flag
-if [[ "${1:-}" == "--wrapper-version" ]]; then
-    echo "apollo-claude version ${APOLLO_CLAUDE_VERSION}"
-    exit 0
-fi
-
 # Handle --self-update flag: force an immediate update check then exit
 if [[ "${1:-}" == "--self-update" ]]; then
     APOLLO_UPDATE_INTERVAL=0
@@ -300,7 +303,7 @@ fi
 
 REPO=""
 
-if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
+if git rev-parse --is-inside-work-tree &>/dev/null; then
     # Inside a git repo — try to extract org/repo from remote origin
     REMOTE_URL="$(git remote get-url origin 2>/dev/null || true)"
     if [[ -n "${REMOTE_URL}" ]]; then
