@@ -152,7 +152,8 @@ This prints metric output to stdout instead of sending it over the network.
 - Run `apollo-claude` and complete the login prompt — this only needs to happen once
 
 **Metrics not appearing in Grafana**
-- Confirm your token is correct (ask in #dev-ai)
+- Confirm your credentials are correct — `APOLLO_USER` is the username, `APOLLO_OTEL_TOKEN` is the password (ask in #dev-ai if unsure)
+- Test your credentials directly: `curl -u 'user:token' -X POST https://dev-ai.apollotech.co/v1/metrics` — a `400` means auth is OK (empty body), `401` means bad credentials
 - Check connectivity: `curl -I https://dev-ai.apollotech.co` (or your custom `APOLLO_OTEL_SERVER` URL)
 - If your team uses a custom collector, ensure `APOLLO_OTEL_SERVER` is set correctly in `~/.apollo-claude/config`
 - Collector logs are available from the team if needed
