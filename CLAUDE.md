@@ -34,6 +34,7 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Prometh
 - `install.sh` — one-liner installer. Uses POSIX `sh` (not bash) for portability. Checks all wrapper dependencies (bash, claude, curl/wget, coreutils, git) before installing. Validates the downloaded wrapper (shebang check + `bash -n` syntax check) before declaring success.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 - `collector/` — self-hosted OTel backend (docker-compose stack, nginx reverse proxy). Defense-in-depth filtering strips prompt/completion content at the collector level.
+- `collector/htpasswd` — per-developer credentials for basic auth (managed with `htpasswd -nbB`).
 - `collector/nginx-site.conf` — nginx site config template for TLS termination and reverse proxy.
 - `README.md` — developer-facing: install, usage, troubleshooting.
 - `SETUP.md` — OTel collector deployment guide.
@@ -80,7 +81,7 @@ The installer checks these at install time:
 | `bash` | yes | Wrapper runs under bash (not sh) |
 | `claude` | yes | The underlying Claude Code CLI |
 | `curl` or `wget` | yes | Auto-update downloads |
-| `grep`, `sed`, `date`, `stat`, `mktemp`, `head`, `cut` | yes | Login check, auto-update, repo detection |
+| `grep`, `sed`, `date`, `stat`, `mktemp`, `head`, `cut`, `base64` | yes | Login check, auto-update, repo detection, basic auth encoding |
 | `git` | no | Repo detection (falls back to directory name) |
 
 ## Config

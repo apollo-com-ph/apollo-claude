@@ -31,7 +31,7 @@ Safe to re-run — existing PATH entries are not duplicated.
 Ask in **#dev-ai** for your personal token. You'll need:
 
 - `APOLLO_USER` — your official email (e.g. `jess@company.com`)
-- `APOLLO_OTEL_TOKEN` — your personal bearer token (looks like `at_xxxxxxxxxxxx`)
+- `APOLLO_OTEL_TOKEN` — your personal token (looks like `at_xxxxxxxxxxxx`)
 
 ### 2. Create the config file
 
@@ -166,11 +166,13 @@ This prints metric output to stdout instead of sending it over the network.
 ```
 apollo-claude/
 ├── bin/
-│   └── apollo-claude     # The wrapper script
+│   └── apollo-claude          # The wrapper script
 ├── collector/
-│   ├── docker-compose.yml
+│   ├── docker-compose.yml     # OTel + Prometheus + Grafana (localhost-only ports)
+│   ├── htpasswd               # Per-developer credentials (basic auth)
+│   ├── nginx-site.conf        # Nginx reverse proxy template
 │   ├── otel-collector-config.yaml
 │   └── prometheus.yml
-├── install.sh            # One-liner installer
-└── SETUP.md              # Collector deployment guide
+├── install.sh                 # One-liner installer
+└── SETUP.md                   # Ubuntu server deployment guide
 ```

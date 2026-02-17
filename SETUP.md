@@ -107,7 +107,7 @@ curl -s http://localhost:13133 | grep -q '"status":"Server available"' && echo "
 Copy the provided site config, replacing `YOUR_DOMAIN` with your actual domain:
 
 ```sh
-sudo cp collector/nginx-site.conf /etc/nginx/sites-available/dev-ai
+sudo cp nginx-site.conf /etc/nginx/sites-available/dev-ai
 sudo sed -i 's/YOUR_DOMAIN/dev-ai.apollotech.co/g' /etc/nginx/sites-available/dev-ai
 sudo ln -sf /etc/nginx/sites-available/dev-ai /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default

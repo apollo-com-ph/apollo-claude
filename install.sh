@@ -60,7 +60,7 @@ fi
 
 # Coreutils used by the wrapper
 _missing=""
-for cmd in grep sed date stat mktemp head cut; do
+for cmd in grep sed date stat mktemp head cut base64; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         _missing="${_missing} ${cmd}"
     fi
@@ -68,7 +68,7 @@ done
 if [ -n "$_missing" ]; then
     die "Missing required utilities:${_missing}"
 fi
-ok "coreutils found (grep, sed, date, stat, mktemp, head, cut)"
+ok "coreutils found (grep, sed, date, stat, mktemp, head, cut, base64)"
 
 if command -v git >/dev/null 2>&1; then
     ok "git found (used for repo detection)"
