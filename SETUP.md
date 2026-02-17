@@ -17,14 +17,29 @@ The `collector/` directory contains a Docker Compose stack that receives telemet
 
 ## Configuration
 
-Create a `.env` file in the `collector/` directory:
+### Developer credentials (htpasswd)
+
+Each developer gets a unique username/password entry in `collector/htpasswd`. The username is their `APOLLO_USER` and the password is their `APOLLO_OTEL_TOKEN`.
+
+Add a developer:
 
 ```sh
-OTEL_COLLECTOR_BEARER_TOKEN=at_xxxxxxxxxxxx
-GRAFANA_ADMIN_PASSWORD=your-secure-password
+htpasswd -nbB alice at_xxxxxxxxxxxx >> collector/htpasswd
 ```
 
-`OTEL_COLLECTOR_BEARER_TOKEN` must match the `APOLLO_OTEL_TOKEN` distributed to developers. The stack will refuse to start without it.
+After adding or removing entries, restart the collector:
+
+```sh
+cd collector && docker compose restart otel-collector
+```
+
+### Grafana
+
+Optionally create a `.env` file in the `collector/` directory:
+
+```sh
+GRAFANA_ADMIN_PASSWORD=your-secure-password
+```
 
 `GRAFANA_ADMIN_PASSWORD` defaults to `changeme` if not set.
 
@@ -45,7 +60,7 @@ curl -s http://localhost:13133 | grep -q '"status":"Server available"' && echo "
 
 ```
 apollo-claude wrappers
-  → OTLP HTTP (port 4318, bearer token auth)
+  → OTLP HTTP (port 4318, basic auth via htpasswd)
   → OTel Collector
       ├─ metrics → Prometheus scrape endpoint (:8889) → Prometheus → Grafana
       └─ logs   → /var/log/otel/claude-events.jsonl (rotated, 100MB/30d)

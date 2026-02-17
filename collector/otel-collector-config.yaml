@@ -1,14 +1,14 @@
 # OpenTelemetry Collector configuration for ApolloTech Claude Code metrics
 #
 # Receives OTLP over HTTP/protobuf (port 4318, TLS-terminated upstream).
-# Authenticates via bearer token.
+# Authenticates via per-developer basic auth (htpasswd).
 # Exports metrics to Prometheus and logs to a file.
 
 extensions:
-  # Bearer token authentication for incoming requests
-  bearertokenauth/server:
-    # Token is set via OTEL_COLLECTOR_BEARER_TOKEN env var at runtime
-    token: "${env:OTEL_COLLECTOR_BEARER_TOKEN}"
+  # Per-developer basic auth via htpasswd file
+  basicauth/server:
+    htpasswd:
+      file: /etc/otel/htpasswd
 
   health_check:
     endpoint: "0.0.0.0:13133"
@@ -19,7 +19,7 @@ receivers:
       http:
         endpoint: "0.0.0.0:4318"
         auth:
-          authenticator: bearertokenauth/server
+          authenticator: basicauth/server
 
 processors:
   # Normalize/enrich resource attributes
@@ -80,7 +80,7 @@ exporters:
 
 service:
   extensions:
-    - bearertokenauth/server
+    - basicauth/server
     - health_check
 
   pipelines:

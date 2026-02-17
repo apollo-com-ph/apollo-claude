@@ -5,10 +5,8 @@ services:
     command: ["--config=/etc/otel/config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
+      - ./htpasswd:/etc/otel/htpasswd:ro
       - otel-logs:/var/log/otel
-    environment:
-      # Set this to the shared bearer token devs use in their apollo-claude config
-      OTEL_COLLECTOR_BEARER_TOKEN: "${OTEL_COLLECTOR_BEARER_TOKEN:?Set OTEL_COLLECTOR_BEARER_TOKEN in .env}"
     ports:
       - "4318:4318"   # OTLP HTTP (TLS terminated upstream by your reverse proxy)
       - "8889:8889"   # Prometheus scrape endpoint

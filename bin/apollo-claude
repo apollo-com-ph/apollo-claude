@@ -55,22 +55,22 @@ _fetch_to_file() {
 }
 
 _test_token() {
-    local server="$1" token="$2"
+    local server="$1" user="$2" token="$3"
     local status
     if command -v curl >/dev/null 2>&1; then
         status="$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             --connect-timeout 5 --max-time 10 \
-            -H "Authorization: Bearer ${token}" \
+            -u "${user}:${token}" \
             "${server}/v1/metrics" 2>/dev/null)" || true
     elif command -v wget >/dev/null 2>&1; then
         status="$(wget --spider -q -S --timeout=10 \
-            --header="Authorization: Bearer ${token}" \
+            --user="${user}" --password="${token}" \
             -O /dev/null "${server}/v1/metrics" 2>&1 \
             | grep -m1 'HTTP/' | grep -oE '[0-9]{3}' || echo "000")"
     else
         return 0  # can't test, assume OK
     fi
-    # 401/403 = bad token; 000 = network error; anything else = auth OK
+    # 401/403 = bad credentials; 000 = network error; anything else = auth OK
     case "${status}" in
         401|403) return 1 ;;
         000)     return 2 ;;
@@ -108,13 +108,13 @@ EOF
                 echo "  Token cannot be empty." >&2
                 continue
             fi
-            _test_token "${APOLLO_OTEL_SERVER}" "${APOLLO_OTEL_TOKEN}" && _rc=0 || _rc=$?
+            _test_token "${APOLLO_OTEL_SERVER}" "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" && _rc=0 || _rc=$?
             if [[ ${_rc} -eq 0 ]]; then
                 break
             elif [[ ${_rc} -eq 2 ]]; then
                 echo "  Could not reach ${APOLLO_OTEL_SERVER} — check the server URL and try again." >&2
             else
-                echo "  Token rejected by ${APOLLO_OTEL_SERVER} (HTTP 401). Please check and try again." >&2
+                echo "  Credentials rejected by ${APOLLO_OTEL_SERVER} (HTTP 401). Check your user/token and try again." >&2
             fi
         done
         echo ""
@@ -331,7 +331,8 @@ export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co}"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${APOLLO_OTEL_TOKEN}"
+_basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64)"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${_basic}"
 export OTEL_RESOURCE_ATTRIBUTES="developer=${APOLLO_USER},team=engineering,repository=${REPO}"
 export OTEL_METRICS_INCLUDE_SESSION_ID=true
 export OTEL_METRICS_INCLUDE_ACCOUNT_UUID=true
