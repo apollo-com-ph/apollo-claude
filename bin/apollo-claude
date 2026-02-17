@@ -61,7 +61,7 @@ _test_token() {
         status="$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             --connect-timeout 5 --max-time 10 \
             -H "Authorization: Bearer ${token}" \
-            "${server}/v1/metrics" 2>/dev/null || echo "000")"
+            "${server}/v1/metrics" 2>/dev/null)" || true
     elif command -v wget >/dev/null 2>&1; then
         status="$(wget --spider -q -S --timeout=10 \
             --header="Authorization: Bearer ${token}" \
