@@ -99,6 +99,12 @@ echo 'GRAFANA_ADMIN_PASSWORD=your-secure-password' > .env
 
 `GRAFANA_ADMIN_PASSWORD` defaults to `changeme` if not set.
 
+Create the Grafana provisioning directory (bind mount target):
+
+```sh
+mkdir -p grafana/provisioning
+```
+
 Start the stack:
 
 ```sh
@@ -116,9 +122,9 @@ curl -s http://localhost:13133 | grep -q '"status":"Server available"' && echo "
 Copy the provided site config, replacing `YOUR_DOMAIN` with your actual domain:
 
 ```sh
-sudo cp nginx-site.conf /etc/nginx/sites-available/dev-ai
-sudo sed -i 's/YOUR_DOMAIN/dev-ai.apollotech.co/g' /etc/nginx/sites-available/dev-ai
-sudo ln -sf /etc/nginx/sites-available/dev-ai /etc/nginx/sites-enabled/
+sudo cp nginx-site.conf /etc/nginx/sites-available/apollo-claude
+sudo sed -i 's/YOUR_DOMAIN/dev-ai.apollotech.co/g' /etc/nginx/sites-available/apollo-claude
+sudo ln -sf /etc/nginx/sites-available/apollo-claude /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
