@@ -2,6 +2,16 @@
 
 The `collector/` directory contains a Docker Compose stack that receives telemetry from `apollo-claude` wrappers and makes it available in Grafana dashboards. This guide covers provisioning a fresh Ubuntu server to run the full stack.
 
+## Quick install
+
+Run the automated installer on a fresh Ubuntu 22.04+ server:
+
+```sh
+bash install_collector.sh
+```
+
+It handles everything below (packages, Docker, firewall, nginx, TLS, first developer). If you prefer to set things up manually, follow the steps in the rest of this guide.
+
 ## Stack overview
 
 | Service | Image / Package | Port (localhost) | Purpose |
@@ -24,7 +34,6 @@ All Docker services bind to `127.0.0.1` only. Nginx handles TLS and proxies exte
 
 - Ubuntu 22.04+ server with a public IP
 - A DNS A record pointing your domain (e.g. `dev-ai.apollotech.co`) to the server
-- Optionally, a second record for Grafana (e.g. `grafana.dev-ai.apollotech.co`)
 - SSH access with sudo
 
 ## 1. Install system packages and configure firewall
@@ -114,17 +123,15 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-The site config proxies:
-- `https://dev-ai.apollotech.co/v1/*` → OTel Collector (port 4318), POST only
-- `https://grafana.dev-ai.apollotech.co` → Grafana (port 3000), optional
+The site config proxies (all on a single domain, path-based routing):
+- `https://dev-ai.apollotech.co/otel/v1/*` → OTel Collector (port 4318), POST only
+- `https://dev-ai.apollotech.co/grafana/*` → Grafana (port 3000)
 
 ## 5. Set up TLS with Let's Encrypt
 
 ```sh
-sudo certbot --nginx -d dev-ai.apollotech.co -d grafana.dev-ai.apollotech.co
+sudo certbot --nginx -d dev-ai.apollotech.co
 ```
-
-Omit the Grafana domain if you don't need external dashboard access.
 
 Certbot automatically:
 - Obtains certificates from Let's Encrypt
@@ -161,7 +168,7 @@ To revoke a developer, remove their line from `htpasswd` and restart.
 
 ```
 apollo-claude wrappers
-  → HTTPS (nginx, TLS via Let's Encrypt)
+  → HTTPS /otel/v1/* (nginx, TLS via Let's Encrypt)
   → OTLP HTTP (port 4318, basic auth via htpasswd)
   → OTel Collector
       ├─ metrics → Prometheus scrape endpoint (:8889) → Prometheus → Grafana

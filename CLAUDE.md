@@ -24,7 +24,7 @@ User runs apollo-claude
 
 **HTTP helpers:** `_fetch_stdout` and `_fetch_to_file` abstract curl vs wget. All network calls (auto-update, version check) go through these helpers, preferring curl with wget as fallback.
 
-**Telemetry pipeline:** Wrapper → OTLP HTTP → OTel Collector (dev-ai.apollotech.co) → Prometheus → Grafana
+**Telemetry pipeline:** Wrapper → OTLP HTTP (`/otel/v1/*`) → Nginx → OTel Collector (dev-ai.apollotech.co) → Prometheus → Grafana (`/grafana`)
 
 The collector stack in `collector/` (docker-compose with OTel Collector, Prometheus, Grafana) is the self-hosted backend — it's separate from the wrapper and deployed independently.
 
@@ -32,10 +32,11 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Prometh
 
 - `bin/apollo-claude` — the wrapper script (bash). This is what gets installed to `~/.local/bin/apollo-claude`.
 - `install.sh` — one-liner installer. Uses POSIX `sh` (not bash) for portability. Checks all wrapper dependencies (bash, claude, curl/wget, coreutils, git) before installing. Validates the downloaded wrapper (shebang check + `bash -n` syntax check) before declaring success.
+- `install_collector.sh` — automated collector stack installer (bash, Ubuntu-only). Handles OS validation, packages, Docker, UFW, repo clone, nginx, TLS, and first developer provisioning in one script.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 - `collector/` — self-hosted OTel backend (docker-compose stack, nginx reverse proxy). Defense-in-depth filtering strips prompt/completion content at the collector level.
 - `collector/htpasswd` — per-developer credentials for basic auth (managed with `htpasswd -nbB`).
-- `collector/nginx-site.conf` — nginx site config template for TLS termination and reverse proxy.
+- `collector/nginx-site.conf` — nginx site config template for TLS termination and path-based reverse proxy (`/otel/v1/*` → collector, `/grafana/*` → Grafana).
 - `README.md` — developer-facing: install, usage, troubleshooting.
 - `SETUP.md` — OTel collector deployment guide.
 
@@ -43,10 +44,11 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Prometh
 
 There is no build step, test suite, or linter. The project is shell scripts.
 
-**Syntax-check both scripts:**
+**Syntax-check all scripts:**
 ```sh
 bash -n bin/apollo-claude
 sh -n install.sh
+bash -n install_collector.sh
 ```
 
 **Run the collector stack locally:**
@@ -94,4 +96,4 @@ User config lives at `~/.apollo-claude/config` with `KEY=VALUE` lines:
 | `APOLLO_OTEL_TOKEN` | yes | Per-developer token (basic auth password, paired with `APOLLO_USER`) |
 | `APOLLO_AUTO_UPDATE` | no | Set `false` to disable auto-update |
 | `APOLLO_UPDATE_INTERVAL` | no | Seconds between update checks (default: 86400) |
-| `APOLLO_OTEL_SERVER` | no | OTel collector endpoint (default: `https://dev-ai.apollotech.co`) |
+| `APOLLO_OTEL_SERVER` | no | OTel collector endpoint (default: `https://dev-ai.apollotech.co/otel`) |

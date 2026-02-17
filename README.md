@@ -40,7 +40,7 @@ mkdir -p ~/.apollo-claude
 cat > ~/.apollo-claude/config <<'EOF'
 APOLLO_USER=you@company.com
 APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
-APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co
+APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co/otel
 EOF
 ```
 
@@ -153,14 +153,14 @@ This prints metric output to stdout instead of sending it over the network.
 
 **Metrics not appearing in Grafana**
 - Confirm your credentials are correct — `APOLLO_USER` is the username, `APOLLO_OTEL_TOKEN` is the password (ask in #dev-ai if unsure)
-- Test your credentials directly: `curl -u 'user:token' -X POST https://dev-ai.apollotech.co/v1/metrics` — a `400` means auth is OK (empty body), `401` means bad credentials
+- Test your credentials directly: `curl -u 'user:token' -X POST https://dev-ai.apollotech.co/otel/v1/metrics` — a `400` means auth is OK (empty body), `401` means bad credentials
 - Check connectivity: `curl -I https://dev-ai.apollotech.co` (or your custom `APOLLO_OTEL_SERVER` URL)
 - If your team uses a custom collector, ensure `APOLLO_OTEL_SERVER` is set correctly in `~/.apollo-claude/config`
 - Collector logs are available from the team if needed
 
 ## Self-hosted collector
 
-`collector/` contains the OTel backend stack (OTel Collector + Prometheus + Grafana). See [SETUP.md](./SETUP.md) for deployment instructions.
+`collector/` contains the OTel backend stack (OTel Collector + Prometheus + Grafana). To deploy on a fresh Ubuntu 22.04+ server, run `bash install_collector.sh` — it automates the full setup (packages, Docker, firewall, nginx, TLS, first developer). See [SETUP.md](./SETUP.md) for manual deployment instructions.
 
 ## Project structure
 
@@ -174,6 +174,7 @@ apollo-claude/
 │   ├── nginx-site.conf        # Nginx reverse proxy template
 │   ├── otel-collector-config.yaml
 │   └── prometheus.yml
-├── install.sh                 # One-liner installer
+├── install.sh                 # One-liner installer (wrapper)
+├── install_collector.sh       # Automated collector stack installer
 └── SETUP.md                   # Ubuntu server deployment guide
 ```
