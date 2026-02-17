@@ -6,8 +6,9 @@ APOLLO_CLAUDE_VERSION=1
 # for ApolloTech usage visibility across the engineering team.
 #
 # Config: ~/.apollo-claude/config
-#   APOLLO_USER=yourname
+#   APOLLO_USER=you@company.com
 #   APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
+#   APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co  (optional)
 
 CONFIG_DIR="${HOME}/.apollo-claude"
 CONFIG_FILE="${CONFIG_DIR}/config"
@@ -50,8 +51,12 @@ No config found at ${CONFIG_FILE}
 Get your credentials from the #dev-ai Slack channel or your team lead.
 
 EOF
-        read -rp "  APOLLO_USER (your shortname, e.g. jess): " APOLLO_USER
+        _default_user="$(git config user.email 2>/dev/null || echo "${USER:-}")"
+        read -rp "  APOLLO_USER (your official email${_default_user:+, default: ${_default_user}}): " APOLLO_USER
+        APOLLO_USER="${APOLLO_USER:-${_default_user}}"
         read -rp "  APOLLO_OTEL_TOKEN (looks like at_xxxx...): " APOLLO_OTEL_TOKEN
+        read -rp "  APOLLO_OTEL_SERVER (default: https://dev-ai.apollotech.co): " APOLLO_OTEL_SERVER
+        APOLLO_OTEL_SERVER="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co}"
         echo ""
 
         if [[ -z "${APOLLO_USER}" ]] || [[ -z "${APOLLO_OTEL_TOKEN}" ]]; then
@@ -63,6 +68,7 @@ EOF
         cat > "${CONFIG_FILE}" <<EOF
 APOLLO_USER=${APOLLO_USER}
 APOLLO_OTEL_TOKEN=${APOLLO_OTEL_TOKEN}
+APOLLO_OTEL_SERVER=${APOLLO_OTEL_SERVER}
 EOF
         chmod 600 "${CONFIG_FILE}"
         echo "  Credentials saved to ${CONFIG_FILE}"
@@ -78,8 +84,9 @@ Please create it with:
 
   mkdir -p ${CONFIG_DIR}
   cat > ${CONFIG_FILE} <<'CONF'
-APOLLO_USER=yourname
+APOLLO_USER=you@company.com
 APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
+APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co
 CONF
 
 You can get your token from the #dev-ai Slack channel or from the team lead.
@@ -285,7 +292,7 @@ export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://dev-ai.apollotech.co
+export OTEL_EXPORTER_OTLP_ENDPOINT="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${APOLLO_OTEL_TOKEN}"
 export OTEL_RESOURCE_ATTRIBUTES="developer=${APOLLO_USER},team=engineering,repository=${REPO}"
 export OTEL_METRICS_INCLUDE_SESSION_ID=true

@@ -30,7 +30,7 @@ Safe to re-run — existing PATH entries are not duplicated.
 
 Ask in **#dev-ai** for your personal token. You'll need:
 
-- `APOLLO_USER` — your shortname (e.g. `jess`, `alex`)
+- `APOLLO_USER` — your official email (e.g. `jess@company.com`)
 - `APOLLO_OTEL_TOKEN` — your personal bearer token (looks like `at_xxxxxxxxxxxx`)
 
 ### 2. Create the config file
@@ -38,12 +38,13 @@ Ask in **#dev-ai** for your personal token. You'll need:
 ```bash
 mkdir -p ~/.apollo-claude
 cat > ~/.apollo-claude/config <<'EOF'
-APOLLO_USER=yourname
+APOLLO_USER=you@company.com
 APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
+APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co
 EOF
 ```
 
-Replace `yourname` and `at_xxxxxxxxxxxx` with the values you received.
+Replace `you@company.com`, `at_xxxxxxxxxxxx`, and optionally the server URL with the values for your team.
 
 The config file is only readable by you (`chmod 600` is recommended):
 
@@ -152,7 +153,8 @@ This prints metric output to stdout instead of sending it over the network.
 
 **Metrics not appearing in Grafana**
 - Confirm your token is correct (ask in #dev-ai)
-- Check connectivity: `curl -I https://dev-ai.apollotech.co`
+- Check connectivity: `curl -I https://dev-ai.apollotech.co` (or your custom `APOLLO_OTEL_SERVER` URL)
+- If your team uses a custom collector, ensure `APOLLO_OTEL_SERVER` is set correctly in `~/.apollo-claude/config`
 - Collector logs are available from the team if needed
 
 ## Self-hosted collector

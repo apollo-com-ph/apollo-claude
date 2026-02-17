@@ -87,3 +87,4 @@ User config lives at `~/.apollo-claude/config` with `KEY=VALUE` lines:
 | `APOLLO_OTEL_TOKEN` | yes | Bearer token for OTel collector |
 | `APOLLO_AUTO_UPDATE` | no | Set `false` to disable auto-update |
 | `APOLLO_UPDATE_INTERVAL` | no | Seconds between update checks (default: 86400) |
+| `APOLLO_OTEL_SERVER` | no | OTel collector endpoint (default: `https://dev-ai.apollotech.co`) |
