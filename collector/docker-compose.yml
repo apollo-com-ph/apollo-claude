@@ -1,0 +1,59 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.0
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
+      - otel-logs:/var/log/otel
+    environment:
+      # Set this to the shared bearer token devs use in their apollo-claude config
+      OTEL_COLLECTOR_BEARER_TOKEN: "${OTEL_COLLECTOR_BEARER_TOKEN:?Set OTEL_COLLECTOR_BEARER_TOKEN in .env}"
+    ports:
+      - "4318:4318"   # OTLP HTTP (TLS terminated upstream by your reverse proxy)
+      - "8889:8889"   # Prometheus scrape endpoint
+      - "13133:13133" # Health check
+    depends_on: []
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=90d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-changeme}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - observability
+
+volumes:
+  otel-logs:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  observability:
+    driver: bridge

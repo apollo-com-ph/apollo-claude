@@ -1,0 +1,299 @@
+#!/usr/bin/env bash
+set -euo pipefail
+APOLLO_CLAUDE_VERSION=1
+
+# apollo-claude: thin wrapper around `claude` that injects OTel telemetry
+# for ApolloTech usage visibility across the engineering team.
+#
+# Config: ~/.apollo-claude/config
+#   APOLLO_USER=yourname
+#   APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
+
+CONFIG_DIR="${HOME}/.apollo-claude"
+CONFIG_FILE="${CONFIG_DIR}/config"
+export CLAUDE_CONFIG_DIR="${CONFIG_DIR}"
+
+# ---------------------------------------------------------------------------
+# Load config
+# ---------------------------------------------------------------------------
+
+if [[ -f "${CONFIG_FILE}" ]]; then
+    # Source only lines that look like VAR=value (ignore comments/blanks)
+    while IFS='=' read -r key value; do
+        [[ "${key}" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${key// }" ]] && continue
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        [[ "${key}" != APOLLO_* ]] && continue
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        export "${key}=${value}"
+    done < "${CONFIG_FILE}"
+fi
+
+# ---------------------------------------------------------------------------
+# First-run / missing config check
+# ---------------------------------------------------------------------------
+
+if [[ ! -d "${CONFIG_DIR}" ]]; then
+    mkdir -p "${CONFIG_DIR}"
+fi
+
+if [[ -z "${APOLLO_USER:-}" ]] || [[ -z "${APOLLO_OTEL_TOKEN:-}" ]]; then
+    if [[ -t 0 ]]; then
+        # Interactive: prompt for credentials on first run
+        cat <<EOF
+
+apollo-claude: first-time setup
+================================
+No config found at ${CONFIG_FILE}
+Get your credentials from the #dev-ai Slack channel or your team lead.
+
+EOF
+        read -rp "  APOLLO_USER (your shortname, e.g. jess): " APOLLO_USER
+        read -rp "  APOLLO_OTEL_TOKEN (looks like at_xxxx...): " APOLLO_OTEL_TOKEN
+        echo ""
+
+        if [[ -z "${APOLLO_USER}" ]] || [[ -z "${APOLLO_OTEL_TOKEN}" ]]; then
+            echo "apollo-claude: credentials are required. Re-run apollo-claude to try again." >&2
+            exit 1
+        fi
+
+        mkdir -p "${CONFIG_DIR}"
+        cat > "${CONFIG_FILE}" <<EOF
+APOLLO_USER=${APOLLO_USER}
+APOLLO_OTEL_TOKEN=${APOLLO_OTEL_TOKEN}
+EOF
+        chmod 600 "${CONFIG_FILE}"
+        echo "  Credentials saved to ${CONFIG_FILE}"
+        echo ""
+    else
+        cat >&2 <<EOF
+
+apollo-claude: configuration required
+======================================
+No config found at ${CONFIG_FILE}
+
+Please create it with:
+
+  mkdir -p ${CONFIG_DIR}
+  cat > ${CONFIG_FILE} <<'CONF'
+APOLLO_USER=yourname
+APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
+CONF
+
+You can get your token from the #dev-ai Slack channel or from the team lead.
+Once configured, re-run: apollo-claude
+
+EOF
+        exit 1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# HTTP helpers (prefer curl, fall back to wget)
+# ---------------------------------------------------------------------------
+
+_fetch_stdout() {
+    local url="$1" timeout="${2:-5}"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 3 --max-time "${timeout}" "${url}" 2>/dev/null
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- --timeout="${timeout}" "${url}" 2>/dev/null
+    fi
+}
+
+_fetch_to_file() {
+    local url="$1" dest="$2" timeout="${3:-30}"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 3 --max-time "${timeout}" "${url}" -o "${dest}" 2>/dev/null
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --timeout="${timeout}" -O "${dest}" "${url}" 2>/dev/null
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Auto-update check
+# ---------------------------------------------------------------------------
+
+_apollo_update_check() {
+    local SCRIPT_PATH
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+
+    # Skip if auto-update is disabled
+    if [[ "${APOLLO_AUTO_UPDATE:-true}" == "false" ]]; then
+        return 0
+    fi
+
+    # Skip if the script file is not writable (e.g. git checkout, read-only install)
+    if [[ ! -w "${SCRIPT_PATH}" ]]; then
+        return 0
+    fi
+
+    local STAMP_FILE="${CONFIG_DIR}/.last_update_check"
+    local INTERVAL="${APOLLO_UPDATE_INTERVAL:-86400}"
+    local NOW
+    NOW="$(date +%s)"
+
+    # Check stamp file mtime — skip if within interval
+    if [[ -f "${STAMP_FILE}" ]]; then
+        local STAMP_MTIME
+        # Linux: stat -c %Y; macOS fallback: stat -f %m
+        STAMP_MTIME="$(stat -c %Y "${STAMP_FILE}" 2>/dev/null || stat -f %m "${STAMP_FILE}" 2>/dev/null || echo 0)"
+        local ELAPSED=$(( NOW - STAMP_MTIME ))
+        if (( ELAPSED < INTERVAL )); then
+            return 0
+        fi
+    fi
+
+    # Touch stamp before fetch to prevent retry storms on timeout
+    touch "${STAMP_FILE}" 2>/dev/null || true
+
+    # Fetch VERSION from GitHub
+    local VERSION_URL="https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/VERSION"
+    local REMOTE_VERSION
+    REMOTE_VERSION="$(_fetch_stdout "${VERSION_URL}" 5 || true)"
+    REMOTE_VERSION="${REMOTE_VERSION//[[:space:]]/}"
+
+    # Validate response is an integer
+    if [[ ! "${REMOTE_VERSION}" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+
+    # Compare to current version; skip if up-to-date
+    if (( REMOTE_VERSION <= APOLLO_CLAUDE_VERSION )); then
+        return 0
+    fi
+
+    # Newer version available — download full script to a temp file in the same dir
+    local SCRIPT_DIR
+    SCRIPT_DIR="$(dirname "${SCRIPT_PATH}")"
+    local TMP_FILE
+    TMP_FILE="$(mktemp "${SCRIPT_DIR}/.apollo-claude.tmp.XXXXXX")"
+
+    local SCRIPT_URL="https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/bin/apollo-claude"
+    if ! _fetch_to_file "${SCRIPT_URL}" "${TMP_FILE}" 30; then
+        rm -f "${TMP_FILE}"
+        return 0
+    fi
+
+    # Validate: non-empty
+    if [[ ! -s "${TMP_FILE}" ]]; then
+        rm -f "${TMP_FILE}"
+        return 0
+    fi
+
+    # Validate: starts with shebang
+    local FIRST_LINE
+    FIRST_LINE="$(head -1 "${TMP_FILE}")"
+    if [[ "${FIRST_LINE}" != "#!"* ]]; then
+        rm -f "${TMP_FILE}"
+        return 0
+    fi
+
+    # Validate: embedded version is greater than current
+    local NEW_VERSION
+    NEW_VERSION="$(grep -m1 '^APOLLO_CLAUDE_VERSION=' "${TMP_FILE}" 2>/dev/null | cut -d= -f2 || true)"
+    NEW_VERSION="${NEW_VERSION//[[:space:]]/}"
+    if [[ ! "${NEW_VERSION}" =~ ^[0-9]+$ ]] || (( NEW_VERSION <= APOLLO_CLAUDE_VERSION )); then
+        rm -f "${TMP_FILE}"
+        return 0
+    fi
+
+    # Validate: passes bash syntax check
+    if ! bash -n "${TMP_FILE}" 2>/dev/null; then
+        rm -f "${TMP_FILE}"
+        return 0
+    fi
+
+    # Preserve permissions: Linux chmod --reference, macOS fallback chmod +x
+    chmod --reference="${SCRIPT_PATH}" "${TMP_FILE}" 2>/dev/null || chmod +x "${TMP_FILE}"
+
+    # Atomic replacement
+    mv "${TMP_FILE}" "${SCRIPT_PATH}"
+
+    echo "apollo-claude: updated to version ${NEW_VERSION} (was ${APOLLO_CLAUDE_VERSION})" >&2
+    return 0
+}
+
+# Handle --wrapper-version flag
+if [[ "${1:-}" == "--wrapper-version" ]]; then
+    echo "apollo-claude version ${APOLLO_CLAUDE_VERSION}"
+    exit 0
+fi
+
+# Handle --self-update flag: force an immediate update check then exit
+if [[ "${1:-}" == "--self-update" ]]; then
+    APOLLO_UPDATE_INTERVAL=0
+    APOLLO_AUTO_UPDATE=true
+    _apollo_update_check || true
+    exit 0
+fi
+
+_apollo_update_check || true
+
+# ---------------------------------------------------------------------------
+# Login check — ensure claude is authenticated
+# ---------------------------------------------------------------------------
+
+if [[ ! -f "${CONFIG_DIR}/.credentials.json" ]]; then
+    if ! claude auth status --json 2>/dev/null | grep -q '"loggedIn": true'; then
+        echo "apollo-claude: not logged in to Claude Code. Starting login..."
+        claude auth login
+
+        # Verify login succeeded
+        if ! claude auth status --json 2>/dev/null | grep -q '"loggedIn": true'; then
+            echo "apollo-claude: login failed. Please try again." >&2
+            exit 1
+        fi
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Repo / project detection
+# ---------------------------------------------------------------------------
+
+REPO=""
+
+if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
+    # Inside a git repo — try to extract org/repo from remote origin
+    REMOTE_URL="$(git remote get-url origin 2>/dev/null || true)"
+    if [[ -n "${REMOTE_URL}" ]]; then
+        # Normalize SSH and HTTPS remote URLs to "org/repo"
+        # Handles:
+        #   git@github.com:org/repo.git
+        #   https://github.com/org/repo.git
+        #   https://github.com/org/repo
+        REPO="$(echo "${REMOTE_URL}" \
+            | sed -E 's|.*[:/]([^/]+/[^/]+?)(\.git)?$|\1|')"
+    fi
+    if [[ -z "${REPO}" ]]; then
+        # Fallback: basename of git root
+        GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        REPO="$(basename "${GIT_ROOT:-${PWD}}")"
+    fi
+else
+    # Not in a git repo — use basename of current directory
+    REPO="$(basename "${PWD}")"
+fi
+
+# ---------------------------------------------------------------------------
+# OTel environment setup
+# ---------------------------------------------------------------------------
+
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://dev-ai.apollotech.co
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${APOLLO_OTEL_TOKEN}"
+export OTEL_RESOURCE_ATTRIBUTES="developer=${APOLLO_USER},team=engineering,repository=${REPO}"
+export OTEL_METRICS_INCLUDE_SESSION_ID=true
+export OTEL_METRICS_INCLUDE_ACCOUNT_UUID=true
+export OTEL_LOG_TOOL_DETAILS=1
+
+# ---------------------------------------------------------------------------
+# Launch claude
+# ---------------------------------------------------------------------------
+
+exec claude "$@"
