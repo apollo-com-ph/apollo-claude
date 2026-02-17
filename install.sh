@@ -167,5 +167,7 @@ printf 'Next steps:\n'
 printf '  1. Reload your shell (or open a new terminal):\n'
 printf '       source %s\n' "${RC_FILE}"
 printf '  2. Run apollo-claude — it will prompt for your credentials on first use:\n'
-printf '       apollo-claude\n'
+printf '       apollo-claude\n\n'
+printf '  Tip: To also enable telemetry in VS Code / JetBrains, run:\n'
+printf '         curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install_otel.sh | sh\n'
 printf '\n'

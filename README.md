@@ -82,6 +82,42 @@ apollo-claude --wrapper-version
 
 You should see the wrapper version (e.g. `apollo-claude version 1`). You can also run `apollo-claude --version` to see the underlying Claude version. If you see a "configuration required" message, check that `~/.apollo-claude/config` exists and contains both variables.
 
+## Telemetry for IDE plugins (VS Code / JetBrains)
+
+IDE plugins bypass the CLI wrapper, so `apollo-claude` alone won't capture telemetry from VS Code or JetBrains usage. A second installer configures Claude Code's global `settings.json` so **all** Claude Code usage gets telemetry — no wrapper needed.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install_otel.sh | sh
+```
+
+Or with wget:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install_otel.sh | sh
+```
+
+This installer will:
+- Check dependencies (`bash`, `jq`, `curl`/`wget`, `base64`)
+- Collect your credentials (or reuse existing `~/.apollo-claude/config` if the CLI wrapper is already installed)
+- Create `~/.apollo-claude/otel-headers.sh` — an auth helper script called by Claude Code
+- Merge OTEL env vars into `~/.claude/settings.json` (preserving all existing settings)
+
+After running, telemetry is active for:
+- **VS Code** (Claude Code extension)
+- **JetBrains** (Claude Code plugin)
+- **CLI** (bare `claude` command)
+
+**Limitation:** Global OTEL telemetry does not include per-repo tagging (the `repository` attribute). For per-repo metrics, use the `apollo-claude` CLI wrapper. You can run both installers for full coverage.
+
+### Two install paths
+
+| Path | Command | Telemetry coverage |
+|------|---------|-------------------|
+| CLI wrapper | `install.sh` | `apollo-claude` CLI only (includes per-repo tagging) |
+| Global OTEL | `install_otel.sh` | All Claude Code usage: CLI, VS Code, JetBrains (no per-repo tagging) |
+
+Both share `~/.apollo-claude/config` for credentials. A dev who wants full coverage can run both.
+
 ## Day-to-day usage
 
 **Use `apollo-claude` for all Apollo repo work.** It behaves identically to `claude` — all flags and arguments pass through unchanged.
@@ -174,7 +210,8 @@ apollo-claude/
 │   ├── nginx-site.conf        # Nginx reverse proxy template
 │   ├── otel-collector-config.yaml
 │   └── prometheus.yml
-├── install.sh                 # One-liner installer (wrapper)
+├── install.sh                 # One-liner installer (CLI wrapper)
+├── install_otel.sh            # One-liner installer (global OTEL for IDE plugins)
 ├── install_collector.sh       # Automated collector stack installer
 └── SETUP.md                   # Ubuntu server deployment guide
 ```

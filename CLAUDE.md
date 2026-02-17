@@ -9,15 +9,23 @@ apollo-claude is a thin bash wrapper around `claude` that injects OpenTelemetry 
 ## Architecture
 
 ```
-User runs apollo-claude
-  → sets CLAUDE_CONFIG_DIR=~/.apollo-claude (auth isolation from plain claude)
-  → loads ~/.apollo-claude/config (APOLLO_USER, APOLLO_OTEL_TOKEN)
-  → handles --wrapper-version / --self-update if requested
-  → auto-update check (daily, via _fetch_stdout/_fetch_to_file helpers)
-  → claude auth login check (skipped if .credentials.json exists)
-  → detects git repo context (org/repo from remote URL)
-  → sets OTEL_* env vars
-  → exec claude "$@"
+CLI wrapper path (apollo-claude):
+  User runs apollo-claude
+    → sets CLAUDE_CONFIG_DIR=~/.apollo-claude (auth isolation from plain claude)
+    → loads ~/.apollo-claude/config (APOLLO_USER, APOLLO_OTEL_TOKEN)
+    → handles --wrapper-version / --self-update if requested
+    → auto-update check (daily, via _fetch_stdout/_fetch_to_file helpers)
+    → claude auth login check (skipped if .credentials.json exists)
+    → detects git repo context (org/repo from remote URL)
+    → sets OTEL_* env vars
+    → exec claude "$@"
+
+Global OTEL path (install_otel.sh):
+  install_otel.sh configures ~/.claude/settings.json once
+    → env vars injected into all Claude Code sessions (CLI, VS Code, JetBrains)
+    → otelHeadersHelper points to ~/.apollo-claude/otel-headers.sh
+    → otel-headers.sh reads ~/.apollo-claude/config, outputs JSON auth headers
+    → Claude Code calls the helper at startup + every ~29 min
 ```
 
 **Auth isolation:** `CLAUDE_CONFIG_DIR` is set to `~/.apollo-claude/`, so Claude's auth tokens (`.credentials.json`) are stored separately from `~/.claude/`. This prevents Apollo's subscription from leaking to plain `claude` usage.
@@ -31,7 +39,9 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Prometh
 ## Key Files
 
 - `bin/apollo-claude` — the wrapper script (bash). This is what gets installed to `~/.local/bin/apollo-claude`.
-- `install.sh` — one-liner installer. Uses POSIX `sh` (not bash) for portability. Checks all wrapper dependencies (bash, claude, curl/wget, coreutils, git) before installing. Validates the downloaded wrapper (shebang check + `bash -n` syntax check) before declaring success.
+- `install.sh` — one-liner installer for the CLI wrapper. Uses POSIX `sh` (not bash) for portability. Checks all wrapper dependencies (bash, claude, curl/wget, coreutils, git) before installing. Validates the downloaded wrapper (shebang check + `bash -n` syntax check) before declaring success.
+- `install_otel.sh` — one-liner installer for global OTEL telemetry (IDE plugins + bare `claude`). Uses POSIX `sh`. Requires `jq` for safe JSON merge into `~/.claude/settings.json`. Creates `~/.apollo-claude/otel-headers.sh` auth helper. Shares `~/.apollo-claude/config` with the CLI wrapper.
+- `~/.apollo-claude/otel-headers.sh` — runtime-generated bash script (created by `install_otel.sh`). Reads config, outputs `{"Authorization": "Basic <base64>"}` JSON. Called by Claude Code's `otelHeadersHelper` setting at startup + every ~29 min.
 - `install_collector.sh` — automated collector stack installer (bash, Ubuntu-only). Handles OS validation, packages, Docker, UFW, repo clone, nginx, TLS, and first developer provisioning in one script.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 - `collector/` — self-hosted OTel backend (docker-compose stack, nginx reverse proxy). Defense-in-depth filtering strips prompt/completion content at the collector level.
@@ -48,6 +58,7 @@ There is no build step, test suite, or linter. The project is shell scripts.
 ```sh
 bash -n bin/apollo-claude
 sh -n install.sh
+sh -n install_otel.sh
 bash -n install_collector.sh
 ```
 
@@ -68,7 +79,7 @@ OTEL_METRICS_EXPORTER=console apollo-claude --version
 
 ## Conventions
 
-- `bin/apollo-claude` uses `set -euo pipefail` and bash. `install.sh` uses `set -eu` and POSIX sh.
+- `bin/apollo-claude` uses `set -euo pipefail` and bash. `install.sh` and `install_otel.sh` use `set -eu` and POSIX sh.
 - Config is read via line-by-line `IFS='=' read`, not `source`, to avoid executing arbitrary code. Only `APOLLO_*` keys are exported; other keys are silently ignored. Leading/trailing whitespace on keys and values is trimmed.
 - All network calls go through `_fetch_stdout`/`_fetch_to_file` (curl preferred, wget fallback) with connect timeouts. The wrapper must never hang or block normal `claude` usage.
 - Auto-update downloads are quadruple-validated (non-empty, shebang present, version bump, `bash -n` syntax check) before atomic `mv` replacement.
@@ -85,6 +96,7 @@ The installer checks these at install time:
 | `curl` or `wget` | yes | Auto-update downloads |
 | `grep`, `sed`, `date`, `stat`, `mktemp`, `head`, `cut`, `base64` | yes | Login check, auto-update, repo detection, basic auth encoding |
 | `git` | no | Repo detection (falls back to directory name) |
+| `jq` | yes (`install_otel.sh` only) | Safe JSON merge into `~/.claude/settings.json` |
 
 ## Config
 
