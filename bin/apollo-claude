@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-APOLLO_CLAUDE_VERSION=2
+APOLLO_CLAUDE_VERSION=3
 
 # apollo-claude: thin wrapper around `claude` that injects OTel telemetry
 # for ApolloTech usage visibility across the engineering team.
