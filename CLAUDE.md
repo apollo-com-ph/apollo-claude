@@ -12,8 +12,8 @@ apollo-claude is a thin bash wrapper around `claude` that injects OpenTelemetry 
 CLI wrapper path (apollo-claude):
   User runs apollo-claude
     → sets CLAUDE_CONFIG_DIR=~/.apollo-claude (auth isolation from plain claude)
+    → handles --self-update / --wrapper-version if requested (no config needed)
     → loads ~/.apollo-claude/config (APOLLO_USER, APOLLO_OTEL_TOKEN)
-    → handles --wrapper-version / --self-update if requested
     → auto-update check (daily, via _fetch_stdout/_fetch_to_file helpers)
     → claude auth login check (skipped if .credentials.json exists)
     → detects git repo context (org/repo from remote URL)
@@ -106,7 +106,7 @@ User config lives at `~/.apollo-claude/config` with `KEY=VALUE` lines:
 
 | Variable | Required | Description |
 |---|---|---|
-| `APOLLO_USER` | yes | Developer shortname (basic auth username) |
+| `APOLLO_USER` | yes | Developer email (basic auth username) |
 | `APOLLO_OTEL_TOKEN` | yes | Per-developer token (basic auth password, paired with `APOLLO_USER`) |
 | `APOLLO_AUTO_UPDATE` | no | Set `false` to disable auto-update |
 | `APOLLO_UPDATE_INTERVAL` | no | Seconds between update checks (default: 86400) |

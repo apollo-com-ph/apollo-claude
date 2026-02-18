@@ -15,34 +15,6 @@ CONFIG_FILE="${CONFIG_DIR}/config"
 export CLAUDE_CONFIG_DIR="${CONFIG_DIR}"
 
 # ---------------------------------------------------------------------------
-# Flags that don't need config
-# ---------------------------------------------------------------------------
-
-# Handle --wrapper-version flag
-if [[ "${1:-}" == "--wrapper-version" ]]; then
-    echo "apollo-claude version ${APOLLO_CLAUDE_VERSION}"
-    exit 0
-fi
-
-# ---------------------------------------------------------------------------
-# Load config
-# ---------------------------------------------------------------------------
-
-if [[ -f "${CONFIG_FILE}" ]]; then
-    # Source only lines that look like VAR=value (ignore comments/blanks)
-    while IFS='=' read -r key value; do
-        [[ "${key}" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${key// }" ]] && continue
-        key="${key#"${key%%[![:space:]]*}"}"
-        key="${key%"${key##*[![:space:]]}"}"
-        [[ "${key}" != APOLLO_* ]] && continue
-        value="${value#"${value%%[![:space:]]*}"}"
-        value="${value%"${value##*[![:space:]]}"}"
-        export "${key}=${value}"
-    done < "${CONFIG_FILE}"
-fi
-
-# ---------------------------------------------------------------------------
 # HTTP helpers (prefer curl, fall back to wget)
 # ---------------------------------------------------------------------------
 
@@ -87,84 +59,6 @@ _test_token() {
         *)       return 0 ;;
     esac
 }
-
-# ---------------------------------------------------------------------------
-# First-run / missing config check
-# ---------------------------------------------------------------------------
-
-if [[ ! -d "${CONFIG_DIR}" ]]; then
-    mkdir -p "${CONFIG_DIR}"
-fi
-
-if [[ -z "${APOLLO_USER:-}" ]] || [[ -z "${APOLLO_OTEL_TOKEN:-}" ]]; then
-    if [[ -t 0 ]]; then
-        # Interactive: prompt for credentials on first run
-        cat <<EOF
-
-apollo-claude: first-time setup
-================================
-No config found at ${CONFIG_FILE}
-Get your credentials from your team lead.
-
-EOF
-        _default_user="$(git config user.email 2>/dev/null || echo "${USER:-}")"
-        read -rp "  APOLLO_USER (your official email${_default_user:+, default: ${_default_user}}): " APOLLO_USER
-        APOLLO_USER="${APOLLO_USER:-${_default_user}}"
-        if [[ -z "${APOLLO_USER}" ]]; then
-            echo "apollo-claude: APOLLO_USER is required. Re-run apollo-claude to try again." >&2
-            exit 1
-        fi
-        while true; do
-            read -rp "  APOLLO_OTEL_SERVER (default: https://dev-ai.apollotech.co/otel): " APOLLO_OTEL_SERVER
-            APOLLO_OTEL_SERVER="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co/otel}"
-            read -rp "  APOLLO_OTEL_TOKEN (looks like at_xxxx...): " APOLLO_OTEL_TOKEN
-            if [[ -z "${APOLLO_OTEL_TOKEN}" ]]; then
-                echo "  Token cannot be empty." >&2
-                continue
-            fi
-            _test_token "${APOLLO_OTEL_SERVER}" "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" && _rc=0 || _rc=$?
-            if [[ ${_rc} -eq 0 ]]; then
-                break
-            elif [[ ${_rc} -eq 2 ]]; then
-                echo "  Could not reach ${APOLLO_OTEL_SERVER} — check the server URL and try again." >&2
-            else
-                echo "  Credentials rejected by ${APOLLO_OTEL_SERVER} (HTTP 401). Check your user/token and try again." >&2
-            fi
-        done
-        echo ""
-
-        mkdir -p "${CONFIG_DIR}"
-        cat > "${CONFIG_FILE}" <<EOF
-APOLLO_USER=${APOLLO_USER}
-APOLLO_OTEL_TOKEN=${APOLLO_OTEL_TOKEN}
-APOLLO_OTEL_SERVER=${APOLLO_OTEL_SERVER}
-EOF
-        chmod 600 "${CONFIG_FILE}"
-        echo "  Credentials saved to ${CONFIG_FILE}"
-        echo ""
-    else
-        cat >&2 <<EOF
-
-apollo-claude: configuration required
-======================================
-No config found at ${CONFIG_FILE}
-
-Please create it with:
-
-  mkdir -p ${CONFIG_DIR}
-  cat > ${CONFIG_FILE} <<'CONF'
-APOLLO_USER=you@company.com
-APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
-APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co/otel
-CONF
-
-You can get your token from your team lead.
-Once configured, re-run: apollo-claude
-
-EOF
-        exit 1
-    fi
-fi
 
 # ---------------------------------------------------------------------------
 # Auto-update check
@@ -270,6 +164,10 @@ _apollo_update_check() {
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# Flags that don't need config
+# ---------------------------------------------------------------------------
+
 # Handle --self-update flag: force an immediate update check then exit
 if [[ "${1:-}" == "--self-update" ]]; then
     APOLLO_UPDATE_INTERVAL=0
@@ -277,6 +175,112 @@ if [[ "${1:-}" == "--self-update" ]]; then
     _apollo_update_check || true
     exit 0
 fi
+
+# Handle --wrapper-version flag
+if [[ "${1:-}" == "--wrapper-version" ]]; then
+    echo "apollo-claude version ${APOLLO_CLAUDE_VERSION}"
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Load config
+# ---------------------------------------------------------------------------
+
+if [[ -f "${CONFIG_FILE}" ]]; then
+    # Source only lines that look like VAR=value (ignore comments/blanks)
+    while IFS='=' read -r key value; do
+        [[ "${key}" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${key// }" ]] && continue
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        [[ "${key}" != APOLLO_* ]] && continue
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        export "${key}=${value}"
+    done < "${CONFIG_FILE}"
+fi
+
+# ---------------------------------------------------------------------------
+# First-run / missing config check
+# ---------------------------------------------------------------------------
+
+if [[ ! -d "${CONFIG_DIR}" ]]; then
+    mkdir -p "${CONFIG_DIR}"
+fi
+
+if [[ -z "${APOLLO_USER:-}" ]] || [[ -z "${APOLLO_OTEL_TOKEN:-}" ]]; then
+    if [[ -t 0 ]]; then
+        # Interactive: prompt for credentials on first run
+        cat <<EOF
+
+apollo-claude: first-time setup
+================================
+No config found at ${CONFIG_FILE}
+Get your credentials from your team lead.
+
+EOF
+        _default_user="$(git config user.email 2>/dev/null || echo "${USER:-}")"
+        read -rp "  APOLLO_USER (your official email${_default_user:+, default: ${_default_user}}): " APOLLO_USER
+        APOLLO_USER="${APOLLO_USER:-${_default_user}}"
+        if [[ -z "${APOLLO_USER}" ]]; then
+            echo "apollo-claude: APOLLO_USER is required. Re-run apollo-claude to try again." >&2
+            exit 1
+        fi
+        while true; do
+            read -rp "  APOLLO_OTEL_SERVER (default: https://dev-ai.apollotech.co/otel): " APOLLO_OTEL_SERVER
+            APOLLO_OTEL_SERVER="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co/otel}"
+            read -rp "  APOLLO_OTEL_TOKEN (looks like at_xxxx...): " APOLLO_OTEL_TOKEN
+            if [[ -z "${APOLLO_OTEL_TOKEN}" ]]; then
+                echo "  Token cannot be empty." >&2
+                continue
+            fi
+            _test_token "${APOLLO_OTEL_SERVER}" "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" && _rc=0 || _rc=$?
+            if [[ ${_rc} -eq 0 ]]; then
+                break
+            elif [[ ${_rc} -eq 2 ]]; then
+                echo "  Could not reach ${APOLLO_OTEL_SERVER} — check the server URL and try again." >&2
+            else
+                echo "  Credentials rejected by ${APOLLO_OTEL_SERVER} (HTTP 401). Check your user/token and try again." >&2
+            fi
+        done
+        echo ""
+
+        mkdir -p "${CONFIG_DIR}"
+        cat > "${CONFIG_FILE}" <<EOF
+APOLLO_USER=${APOLLO_USER}
+APOLLO_OTEL_TOKEN=${APOLLO_OTEL_TOKEN}
+APOLLO_OTEL_SERVER=${APOLLO_OTEL_SERVER}
+EOF
+        chmod 600 "${CONFIG_FILE}"
+        echo "  Credentials saved to ${CONFIG_FILE}"
+        echo ""
+    else
+        cat >&2 <<EOF
+
+apollo-claude: configuration required
+======================================
+No config found at ${CONFIG_FILE}
+
+Please create it with:
+
+  mkdir -p ${CONFIG_DIR}
+  cat > ${CONFIG_FILE} <<'CONF'
+APOLLO_USER=you@company.com
+APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
+APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co/otel
+CONF
+
+You can get your token from your team lead.
+Once configured, re-run: apollo-claude
+
+EOF
+        exit 1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Auto-update check (passive, background)
+# ---------------------------------------------------------------------------
 
 _apollo_update_check || true
 
@@ -334,7 +338,7 @@ export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co/otel}"
-_basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64)"
+_basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 | tr -d '\n')"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${_basic}"
 export OTEL_RESOURCE_ATTRIBUTES="developer=${APOLLO_USER},team=engineering,repository=${REPO}"
 export OTEL_METRICS_INCLUDE_SESSION_ID=true

@@ -35,10 +35,12 @@ processors:
         value: claude-code
         action: upsert
 
-  # Extract X-Apollo-Repository header into a resource attribute (IDE plugin path).
+  # Extract X-Apollo-Repository header into a data-point attribute (IDE plugin path).
   # action: insert means it's a no-op if repository is already set (CLI wrapper path).
-  resource/repo-from-header:
-    attributes:
+  # Uses attributes processor (not resource) because from_context is only supported there.
+  # resource_to_telemetry_conversion on the Prometheus exporter promotes these to labels.
+  attributes/repo-from-header:
+    actions:
       - key: repository
         from_context: metadata.x-apollo-repository
         action: insert
@@ -95,12 +97,12 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resource/repo-from-header, resource, batch]
+      processors: [memory_limiter, resource, attributes/repo-from-header, attributes, batch]
       exporters: [prometheus]
 
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resource/repo-from-header, resource, attributes, batch]
+      processors: [memory_limiter, resource, attributes/repo-from-header, attributes, batch]
       exporters: [file]
 
   telemetry:

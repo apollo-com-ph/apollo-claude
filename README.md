@@ -211,5 +211,7 @@ apollo-claude/
 ├── install.sh                 # One-liner installer (CLI wrapper)
 ├── install_otel.sh            # One-liner installer (global OTEL for IDE plugins)
 ├── install_collector.sh       # Automated collector stack installer
+├── CLAUDE.md                  # Claude Code guidance
+├── VERSION                    # Wrapper version (synced with APOLLO_CLAUDE_VERSION)
 └── SETUP.md                   # Ubuntu server deployment guide
 ```

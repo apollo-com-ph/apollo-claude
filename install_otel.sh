@@ -235,7 +235,7 @@ if [[ -z "${APOLLO_USER}" ]] || [[ -z "${APOLLO_OTEL_TOKEN}" ]]; then
     exit 1
 fi
 
-_basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64)"
+_basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 | tr -d '\n')"
 
 # --- Repo detection (best-effort, never fails the script) ---
 _repo=""
@@ -251,6 +251,8 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree &>/dev/
 else
     _repo="$(basename "${PWD}")"
 fi
+
+_repo="$(printf '%s' "${_repo}" | tr -cd 'a-zA-Z0-9._/-')"
 
 if [[ -n "${_repo}" ]]; then
     printf '{"Authorization": "Basic %s", "X-Apollo-Repository": "%s"}\n' "${_basic}" "${_repo}"
