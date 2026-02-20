@@ -70,7 +70,6 @@ exporters:
   # Prometheus exporter — scrape endpoint for Grafana dashboards
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: "claude_code"
     resource_to_telemetry_conversion:
       enabled: true  # expose developer/repository labels on every metric
 
