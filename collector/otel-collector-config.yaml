@@ -82,6 +82,12 @@ exporters:
       max_days: 30
       max_backups: 5
 
+  # Loki exporter — queryable log storage for Grafana Explore
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
   # Optional: forward everything to a remote OTLP backend
   # Uncomment and configure if you add a central store later.
   # otlp/remote:
@@ -103,7 +109,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource, attributes/repo-from-header, attributes, batch]
-      exporters: [file]
+      exporters: [file, otlphttp/loki]
 
   telemetry:
     logs:
