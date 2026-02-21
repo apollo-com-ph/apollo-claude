@@ -6,10 +6,8 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
       - ./htpasswd:/etc/otel/htpasswd:ro
-      - otel-logs:/var/log/otel
     ports:
       - "127.0.0.1:4318:4318"   # OTLP HTTP (nginx terminates TLS)
-      - "127.0.0.1:8889:8889"   # Prometheus scrape (internal)
       - "127.0.0.1:13133:13133" # Health check (internal)
     depends_on:
       - loki
@@ -28,22 +26,6 @@ services:
     networks:
       - observability
 
-  prometheus:
-    image: prom/prometheus:v2.55.1
-    restart: unless-stopped
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=90d"
-      - "--web.enable-lifecycle"
-    ports:
-      - "127.0.0.1:9090:9090"
-    networks:
-      - observability
-
   grafana:
     image: grafana/grafana:11.4.0
     restart: unless-stopped
@@ -58,14 +40,11 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
-      - prometheus
       - loki
     networks:
       - observability
 
 volumes:
-  otel-logs:
-  prometheus-data:
   grafana-data:
   loki-data:
 

@@ -1,1570 +1,622 @@
 {
-  "annotations": {
+  "uid": "claude-code-overview",
+  "title": "Claude Code Overview",
+  "tags": ["claude-code", "otel"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
     "list": [
       {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "name": "user",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "user_email", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "model", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      },
+      {
+        "name": "tool",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "tool_name", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
       }
     ]
   },
-  "description": "Claude Code Observability Dashboard - Monitor usage, costs, and performance",
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": null,
-  "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "title": "📊 Overview",
+      "id": 100,
+      "title": "",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [],
       "collapsed": false
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 10
-              },
-              {
-                "color": "red",
-                "value": 50
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 1
-      },
       "id": 1,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(claude_code_session_count_total{job=\"otel-collector\"}[1h]))",
-          "interval": "",
-          "legendFormat": "Sessions (1h)",
-          "refId": "A"
-        }
-      ],
-      "title": "Active Sessions (1h)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "title": "Total Cost (USD)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap cost_usd [$__range]))",
+        "legendFormat": "Cost"
+      }],
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
+          "unit": "currencyUSD",
+          "decimals": 2,
           "thresholds": {
-            "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5
-              },
-              {
-                "color": "red",
-                "value": 20
-              }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
             ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 1
-      },
+          }
+        }
+      }
+    },
+    {
       "id": 2,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[1h]))",
-          "interval": "",
-          "legendFormat": "Cost (1h)",
-          "refId": "A"
-        }
-      ],
-      "title": "Cost (Last Hour)",
-      "type": "stat"
+      "title": "Total Sessions",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "count(sum by (session_id) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | user_email=~\"$user\" [$__range])))"
+      }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 10000
-              },
-              {
-                "color": "red",
-                "value": 50000
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 1
-      },
       "id": 3,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[1h]))",
-          "interval": "",
-          "legendFormat": "Tokens (1h)",
-          "refId": "A"
-        }
-      ],
-      "title": "Token Usage (1h)",
-      "type": "stat"
+      "title": "Total Prompts",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | user_email=~\"$user\" [$__range]))"
+      }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "steps": [{ "color": "purple", "value": null }] } } }
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 500
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 1
-      },
       "id": 4,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{job=\"otel-collector\"}[1h]))",
-          "interval": "",
-          "legendFormat": "Lines Changed (1h)",
-          "refId": "A"
-        }
-      ],
-      "title": "Lines of Code (1h)",
-      "type": "stat"
+      "title": "Total API Requests",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" [$__range]))"
+      }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "steps": [{ "color": "super-light-blue", "value": null }] } } }
     },
     {
-      "title": "💰 Cost & Usage Analysis",
-      "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
-      "collapsed": false
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "USD",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 6
-      },
       "id": 5,
-      "options": {
-        "legend": {
-          "calcs": ["max", "mean"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[1h]))",
-          "interval": "",
-          "legendFormat": "{{model}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Cost by Model (Hourly)",
-      "type": "timeseries"
+      "title": "Total Tokens",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap input_tokens [$__range])) + sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap output_tokens [$__range]))",
+        "legendFormat": "Tokens"
+      }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "steps": [{ "color": "orange", "value": null }] } } }
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Tokens (log scale)",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "log",
-              "log": 10
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "cacheRead"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "blue"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "output"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "input"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "cacheCreation"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "purple"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 2
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 6
-      },
       "id": 6,
-      "options": {
-        "legend": {
-          "calcs": ["max", "mean"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (type) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]) * 60)",
-          "interval": "",
-          "legendFormat": "{{type}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Token Usage Rate by Type",
-      "type": "timeseries"
+      "title": "API Errors",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | user_email=~\"$user\" [$__range]))"
+      }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
     },
+
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Requests",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": ".*sonnet.*"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "purple"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": ".*haiku.*"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "blue"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 14
-      },
-      "id": 15,
-      "options": {
-        "legend": {
-          "calcs": ["lastNotNull", "max", "mean"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (model) (changes(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[5m]))",
-          "interval": "",
-          "legendFormat": "{{model}}",
-          "refId": "A"
-        }
-      ],
-      "title": "API Requests by Model (5min rate)",
-      "type": "timeseries"
-    },
-    {
-      "title": "🔧 Tool Usage & Performance",
+      "id": 101,
+      "title": "Cost & Tokens",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "panels": [],
       "collapsed": false
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Tool Usage Rate (per 5min)",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Bash"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "red"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Read"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "blue"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Write"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Grep"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 23
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": ["lastNotNull", "mean"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" [5m]))",
-          "interval": "",
-          "legendFormat": "{{tool_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Tool Usage Rate Over Time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Total Tool Count",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Bash"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "red"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Read"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "blue"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Write"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Grep"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 23
-      },
-      "id": 14,
-      "options": {
-        "legend": {
-          "calcs": ["lastNotNull", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" [$__range]))",
-          "interval": "",
-          "legendFormat": "{{tool_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Cumulative Tool Usage",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Success Rate %",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 80
-              },
-              {
-                "color": "green",
-                "value": 95
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 23
-      },
-      "id": 8,
-      "options": {
-        "legend": {
-          "calcs": ["last"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "100 * (sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" | json | success=\"true\" [15m]))) / (sum by (tool_name) (count_over_time({service_name=\"claude-code\"} |= \"claude_code.tool_result\" [15m])))",
-          "interval": "",
-          "legendFormat": "{{tool_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Tool Success Rate",
-      "type": "timeseries"
-    },
-    {
-      "title": "⚡ Performance & Errors",
-      "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 39},
-      "collapsed": false
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Milliseconds",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 40
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "avg by (model) (avg_over_time({service_name=\"claude-code\"} |= \"claude_code.api_request\" | unwrap duration_ms [$__interval]))",
-          "interval": "",
-          "legendFormat": "{{model}}",
-          "refId": "A"
-        }
-      ],
-      "title": "API Request Duration by Model",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "Errors/min",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 40
-      },
       "id": 10,
-      "options": {
-        "legend": {
-          "calcs": ["sum"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "sum by (status_code) (rate({service_name=\"claude-code\"} |= \"claude_code.api_error\" | json | __error__ = \"\" [$__interval]))",
-          "interval": "",
-          "legendFormat": "HTTP {{status_code}}",
-          "refId": "A"
-        }
-      ],
-      "title": "API Error Rate",
-      "type": "timeseries"
-    },
-    {
-      "title": "📝 User Activity & Productivity",
-      "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 48},
-      "collapsed": false
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "title": "Cost Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap cost_usd [$__interval]))",
+        "legendFormat": "{{user_email}}"
+      }],
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 49
-      },
+          "unit": "currencyUSD",
+          "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+    {
       "id": 11,
-      "options": {
-        "legend": {
-          "calcs": ["sum"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (type) (rate(claude_code_lines_of_code_count_total{job=\"otel-collector\"}[5m]) * 60)",
-          "interval": "",
-          "legendFormat": "{{type}} lines/min",
-          "refId": "A"
-        }
-      ],
-      "title": "Code Changes Rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "title": "Cost by Model Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (model) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap cost_usd [$__interval]))",
+        "legendFormat": "{{model}}"
+      }],
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 49
-      },
-      "id": 12,
-      "options": {
-        "legend": {
-          "calcs": ["sum"],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "unit": "currencyUSD",
+          "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }
         }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\"}[1h])) or vector(0)",
-          "interval": "",
-          "legendFormat": "Commits",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\"}[1h])) or vector(0)",
-          "interval": "",
-          "legendFormat": "Pull Requests",
-          "refId": "B"
-        }
-      ],
-      "title": "Development Activity (Hourly)",
-      "type": "timeseries"
+      }
     },
     {
-      "title": "🔍 Event Logs",
+      "id": 12,
+      "title": "Token Usage Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap input_tokens [$__interval]))",
+          "legendFormat": "Input"
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap output_tokens [$__interval]))",
+          "legendFormat": "Output"
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap cache_read_tokens [$__interval]))",
+          "legendFormat": "Cache Read"
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap cache_creation_tokens [$__interval]))",
+          "legendFormat": "Cache Creation"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 10 } } }
+    },
+    {
+      "id": 13,
+      "title": "Token Usage by Model",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by (model) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap input_tokens [$__interval]))",
+          "legendFormat": "{{model}} input"
+        },
+        {
+          "expr": "sum by (model) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap output_tokens [$__interval]))",
+          "legendFormat": "{{model}} output"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 10 } } }
+    },
+    {
+      "id": 14,
+      "title": "Cost by User",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | unwrap cost_usd [$__range]))",
+        "legendFormat": "{{user_email}}"
+      }]
+    },
+    {
+      "id": 15,
+      "title": "Cost by Model",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (model) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | model=~\"$model\" | unwrap cost_usd [$__range]))",
+        "legendFormat": "{{model}}"
+      }]
+    },
+    {
+      "id": 16,
+      "title": "Tokens by User",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | unwrap input_tokens [$__range])) + sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | unwrap output_tokens [$__range]))",
+        "legendFormat": "{{user_email}}"
+      }]
+    },
+
+    {
+      "id": 102,
+      "title": "API Performance",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 57},
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "panels": [],
       "collapsed": false
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 58
-      },
-      "id": 13,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "{service_name=\"claude-code\"} |= \"claude_code.tool_result\" | line_format \"{{.event_timestamp}} [{{.tool_name}}] {{if eq .success \\\"true\\\"}}✅{{else}}❌{{end}} {{.duration_ms}}ms {{if .error}}ERROR: {{.error}}{{end}}\"",
-          "refId": "A"
-        }
-      ],
-      "title": "Tool Execution Events",
-      "type": "logs"
+      "id": 20,
+      "title": "API Latency (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "avg by (model) (avg_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap duration_ms [$__interval]))",
+        "legendFormat": "{{model}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } } }
     },
     {
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 58
-      },
-      "id": 17,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
-      },
-      "targets": [
+      "id": 21,
+      "title": "API Latency by User (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "avg by (user_email) (avg_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user\" | model=~\"$model\" | unwrap duration_ms [$__interval]))",
+        "legendFormat": "{{user_email}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } } }
+    },
+    {
+      "id": 22,
+      "title": "API Errors Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (status_code) (count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | user_email=~\"$user\" [$__interval]))",
+        "legendFormat": "HTTP {{status_code}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "drawStyle": "bars" },
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "id": 23,
+      "title": "API Errors by Model",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (model) (count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | user_email=~\"$user\" [$__interval]))",
+        "legendFormat": "{{model}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "drawStyle": "bars" },
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "id": 24,
+      "title": "API Error Log",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "{service_name=\"claude-code\"} | event_name=\"api_error\" | user_email=~\"$user\"",
+        "refId": "A"
+      }],
+      "transformations": [
         {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "{service_name=\"claude-code\"} |= \"claude_code.api_error\" | line_format \"{{.event_timestamp}} [{{.model}}] ❌ HTTP {{.status_code}} {{.duration_ms}}ms ERROR: {{.error}}\"",
-          "refId": "A"
+          "id": "extractFields",
+          "options": { "source": "labels", "keepTime": true }
         }
       ],
-      "title": "API Error Events",
-      "type": "logs"
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "Time", "desc": true }] }
+    },
+
+    {
+      "id": 103,
+      "title": "Tool Usage",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "title": "Tool Usage Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 57 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" [$__interval]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "id": 31,
+      "title": "Tool Success vs Failure",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 57 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" | success=\"true\" [$__interval]))",
+          "legendFormat": "Success"
+        },
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" | success=\"false\" [$__interval]))",
+          "legendFormat": "Failure"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Success" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Failure" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "title": "Tool Failure Rate by Tool",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 65 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" | success=\"false\" [$__interval]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "drawStyle": "bars" },
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "id": 33,
+      "title": "Tool Execution Duration (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 65 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "avg by (tool_name) (avg_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" | unwrap duration_ms [$__interval]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } } }
+    },
+    {
+      "id": 34,
+      "title": "Tool Usage Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 73 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" [$__range]))",
+        "legendFormat": "{{tool_name}}"
+      }]
+    },
+    {
+      "id": 35,
+      "title": "Tool Usage by User",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 73 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | tool_name=~\"$tool\" [$__range]))",
+        "legendFormat": "{{user_email}}"
+      }]
+    },
+    {
+      "id": 36,
+      "title": "Tool Errors Log",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 73 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "{service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" | success=\"false\""
+      }],
+      "options": { "showTime": true, "sortOrder": "Descending", "enableLogDetails": true }
+    },
+
+    {
+      "id": 104,
+      "title": "Tool Decisions",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 81 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 40,
+      "title": "Tool Decisions Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 82 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"tool_decision\" | user_email=~\"$user\" | decision=\"accept\" [$__interval]))",
+          "legendFormat": "Accepted"
+        },
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"tool_decision\" | user_email=~\"$user\" | decision=\"reject\" [$__interval]))",
+          "legendFormat": "Rejected"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Accepted" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Rejected" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "title": "Tool Decisions by Tool",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 82 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name, decision) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_decision\" | user_email=~\"$user\" [$__interval]))",
+        "legendFormat": "{{tool_name}} ({{decision}})"
+      }],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "id": 42,
+      "title": "Decision Source Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 90 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (source) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_decision\" | user_email=~\"$user\" [$__range]))",
+        "legendFormat": "{{source}}"
+      }]
+    },
+    {
+      "id": 43,
+      "title": "Tool Result Decision Source",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 90 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (source) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_result\" | user_email=~\"$user\" [$__range]))",
+        "legendFormat": "{{source}}"
+      }]
+    },
+    {
+      "id": 44,
+      "title": "Rejections by Tool",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 90 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\"} | event_name=\"tool_decision\" | user_email=~\"$user\" | decision=\"reject\" [$__range]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": { "defaults": { "noValue": "0", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+
+    {
+      "id": 105,
+      "title": "User Activity",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 98 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 50,
+      "title": "Prompts Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 99 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (count_over_time({service_name=\"claude-code\"} | event_name=\"user_prompt\" | user_email=~\"$user\" [$__interval]))",
+        "legendFormat": "{{user_email}}"
+      }],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "id": 51,
+      "title": "Prompt Length Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 99 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "avg(avg_over_time({service_name=\"claude-code\"} | event_name=\"user_prompt\" | user_email=~\"$user\" | unwrap prompt_length [$__interval]))",
+          "legendFormat": "Avg Prompt Length"
+        },
+        {
+          "expr": "max(max_over_time({service_name=\"claude-code\"} | event_name=\"user_prompt\" | user_email=~\"$user\" | unwrap prompt_length [$__interval]))",
+          "legendFormat": "Max Prompt Length"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } }
+    },
+    {
+      "id": 52,
+      "title": "Prompts by User",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 107 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (count_over_time({service_name=\"claude-code\"} | event_name=\"user_prompt\" | user_email=~\"$user\" [$__range]))",
+        "legendFormat": "{{user_email}}"
+      }]
+    },
+    {
+      "id": 53,
+      "title": "Sessions by User",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 107 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "count by (user_email) (sum by (user_email, session_id) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | user_email=~\"$user\" [$__range])))",
+        "legendFormat": "{{user_email}}"
+      }],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+    {
+      "id": 54,
+      "title": "Terminal Type Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 107 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (terminal_type) (count_over_time({service_name=\"claude-code\"} | event_name=\"user_prompt\" | user_email=~\"$user\" [$__range]))",
+        "legendFormat": "{{terminal_type}}"
+      }]
+    },
+
+    {
+      "id": 106,
+      "title": "Events Log",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 115 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 60,
+      "title": "All Events",
+      "type": "logs",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 116 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "{service_name=\"claude-code\"} | user_email=~\"$user\""
+      }],
+      "options": { "showTime": true, "sortOrder": "Descending", "enableLogDetails": true }
     }
   ],
-  "refresh": "30s",
-  "schemaVersion": 27,
-  "style": "dark",
-  "tags": ["claude-code", "observability"],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "",
-  "title": "Claude Code Observability",
-  "uid": "claude-code-obs",
-  "version": 1
+  "schemaVersion": 39
 }

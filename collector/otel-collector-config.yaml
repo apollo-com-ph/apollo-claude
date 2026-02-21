@@ -2,7 +2,7 @@
 #
 # Receives OTLP over HTTP/protobuf (port 4318, TLS-terminated upstream).
 # Authenticates via per-developer basic auth (htpasswd).
-# Exports metrics to Prometheus and logs to a file.
+# Exports logs to Loki.
 
 extensions:
   # Per-developer basic auth via htpasswd file
@@ -37,21 +37,30 @@ processors:
 
   # Extract X-Apollo-Repository header into a data-point attribute (IDE plugin path).
   # action: insert means it's a no-op if repository is already set (CLI wrapper path).
-  # Uses attributes processor (not resource) because from_context is only supported there.
-  # resource_to_telemetry_conversion on the Prometheus exporter promotes these to labels.
   attributes/repo-from-header:
     actions:
       - key: repository
         from_context: metadata.x-apollo-repository
         action: insert
 
-  # Batch for efficiency
-  batch:
-    timeout: 10s
-    send_batch_size: 1024
+  # Split each log record into its own ResourceLogs based on the specified keys,
+  # then promote those keys to resource-level attributes so Loki indexes them as labels.
+  # Fixes the "shared Resource overwrite" bug where the last record in a batch would
+  # overwrite attribute values for all records sharing the same Resource.
+  groupbyattrs:
+    keys:
+      - event.name
+      - user.email
+      - model
+      - tool_name
+      - session.id
+      - terminal.type
+      - success
+      - decision
+      - status_code
+      - source
 
   # Drop any accidentally included prompt content (defence-in-depth)
-  # Attributes that could contain prompt text are removed.
   attributes:
     actions:
       - key: prompt
@@ -61,38 +70,22 @@ processors:
       - key: message.content
         action: delete
 
+  # Batch for efficiency
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
   memory_limiter:
     check_interval: 5s
     limit_mib: 256
     spike_limit_mib: 64
 
 exporters:
-  # Prometheus exporter — scrape endpoint for Grafana dashboards
-  prometheus:
-    endpoint: "0.0.0.0:8889"
-    resource_to_telemetry_conversion:
-      enabled: true  # expose developer/repository labels on every metric
-
-  # File exporter for logs (tool events, API calls, token usage per-request)
-  file:
-    path: /var/log/otel/claude-events.jsonl
-    rotation:
-      max_megabytes: 100
-      max_days: 30
-      max_backups: 5
-
-  # Loki exporter — queryable log storage for Grafana Explore
-  otlphttp/loki:
+  # Loki exporter — queryable log storage for Grafana dashboards
+  otlp_http/loki:
     endpoint: http://loki:3100/otlp
     tls:
       insecure: true
-
-  # Optional: forward everything to a remote OTLP backend
-  # Uncomment and configure if you add a central store later.
-  # otlp/remote:
-  #   endpoint: "https://your-backend.example.com"
-  #   headers:
-  #     Authorization: "Bearer ${env:REMOTE_BACKEND_TOKEN}"
 
 service:
   extensions:
@@ -100,15 +93,10 @@ service:
     - health_check
 
   pipelines:
-    metrics:
-      receivers: [otlp]
-      processors: [memory_limiter, resource, attributes/repo-from-header, attributes, batch]
-      exporters: [prometheus]
-
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resource, attributes/repo-from-header, attributes, batch]
-      exporters: [file, otlphttp/loki]
+      processors: [memory_limiter, resource, attributes/repo-from-header, groupbyattrs, attributes, batch]
+      exporters: [otlp_http/loki]
 
   telemetry:
     logs:
