@@ -264,12 +264,9 @@ fi
 ############################################################
 OTEL_ENV='{
   "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-  "OTEL_METRICS_EXPORTER": "otlp",
   "OTEL_LOGS_EXPORTER": "otlp",
   "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
   "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
-  "OTEL_METRICS_INCLUDE_SESSION_ID": "true",
-  "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
   "OTEL_LOG_TOOL_DETAILS": "1"
 }'
 
