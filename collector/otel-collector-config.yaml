@@ -1,4 +1,4 @@
-# OpenTelemetry Collector configuration for ApolloTech Claude Code metrics
+# OpenTelemetry Collector configuration for ApolloTech Claude Code logs
 #
 # Receives OTLP over HTTP/protobuf (port 4318, TLS-terminated upstream).
 # Authenticates via per-developer basic auth (htpasswd).

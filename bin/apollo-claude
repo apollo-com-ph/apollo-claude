@@ -43,11 +43,11 @@ _test_token() {
         status="$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             --connect-timeout 5 --max-time 10 \
             -u "${user}:${token}" \
-            "${server}/v1/metrics" 2>/dev/null)" || true
+            "${server}/v1/logs" 2>/dev/null)" || true
     elif command -v wget >/dev/null 2>&1; then
         status="$(wget --spider -q -S --timeout=10 \
             --user="${user}" --password="${token}" \
-            -O /dev/null "${server}/v1/metrics" 2>&1 \
+            -O /dev/null "${server}/v1/logs" 2>&1 \
             | grep -m1 'HTTP/' | grep -oE '[0-9]{3}' || echo "000")"
     else
         return 0  # can't test, assume OK
