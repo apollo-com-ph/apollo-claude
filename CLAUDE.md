@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-apollo-claude configures OpenTelemetry telemetry for Claude Code, giving ApolloTech engineering visibility into usage across the team — by developer, repo, and model. It does **not** capture prompts, responses, or code — only aggregate metrics (session count, cost, tokens, active time, etc.).
+apollo-claude configures OpenTelemetry telemetry for Claude Code, giving ApolloTech engineering visibility into usage across the team — by developer, repo, and model. It does **not** capture prompts, responses, or code — only usage events (session count, cost, tokens, active time, etc.).
 
 The primary installer is `setup-apollotech-otel-for-claude.sh`, which writes into `~/.claude/` and covers all Claude Code usage (VS Code, JetBrains, CLI) without a wrapper. An optional CLI wrapper (`bin/apollo-claude`) exists for teams that need auth isolation.
 

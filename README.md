@@ -81,7 +81,7 @@ jq '.env = ((.env // {}) + {
 
 ### 5. Restart Claude Code
 
-Open a new terminal or restart the VS Code/JetBrains extension. Metrics should appear in Grafana within a few minutes of starting a session.
+Open a new terminal or restart the VS Code/JetBrains extension. Data should appear in Grafana within a few minutes of starting a session.
 
 ## Day-to-day usage
 
@@ -89,9 +89,9 @@ Just use `claude` normally — no wrapper or extra command needed. The OTEL sett
 
 ## What data is collected
 
-The following metrics are sent to `dev-ai.apollotech.co`, tagged with your `APOLLO_USER` and the detected repository:
+The following usage events are sent to `dev-ai.apollotech.co` as OTLP logs, tagged with your `APOLLO_USER` and the detected repository:
 
-| Metric | What it tells us |
+| Event | What it tells us |
 |--------|-----------------|
 | `claude_code.session.count` | How often each dev uses Claude Code |
 | `claude_code.cost.usage` | Per-session cost in USD, by model |
@@ -122,14 +122,14 @@ To verify telemetry is active without hitting the remote collector, override the
 OTEL_LOGS_EXPORTER=console claude --version
 ```
 
-This prints metric output to stdout instead of sending it over the network.
+This prints log output to stdout instead of sending it over the network.
 
 ## Troubleshooting
 
-**Metrics not appearing in Grafana**
+**Data not appearing in Grafana**
 - Confirm your credentials are correct — test them directly:
   ```sh
-  curl -u 'you@company.com:at_xxxxxxxxxxxx' -X POST https://dev-ai.apollotech.co/otel/v1/metrics
+  curl -u 'you@company.com:at_xxxxxxxxxxxx' -X POST https://dev-ai.apollotech.co/otel/v1/logs
   ```
   A `400` response means auth is OK (empty body rejected). A `401` means bad credentials.
 - Check connectivity: `curl -I https://dev-ai.apollotech.co`
