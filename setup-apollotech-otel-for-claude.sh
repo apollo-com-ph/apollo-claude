@@ -94,7 +94,7 @@ check_deps() {
   info "Checking dependencies..."
   local missing=""
 
-  for dep in bash claude jq base64; do
+  for dep in bash claude jq base64 grep; do
     if ! command -v "$dep" >/dev/null 2>&1; then
       missing="$missing $dep"
     else
@@ -108,7 +108,16 @@ check_deps() {
     command -v curl >/dev/null 2>&1 && log "  curl: found" || log "  wget: found"
   fi
 
-  for dep in date chmod cp mkdir; do
+  for dep in date chmod cp mkdir mv; do
+    if ! command -v "$dep" >/dev/null 2>&1; then
+      missing="$missing $dep"
+    else
+      log "  $dep: found"
+    fi
+  done
+
+  # Dependencies required by the installed apollotech-otel-headers.sh helper
+  for dep in tr sed basename; do
     if ! command -v "$dep" >/dev/null 2>&1; then
       missing="$missing $dep"
     else
