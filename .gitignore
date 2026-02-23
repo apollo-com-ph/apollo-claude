@@ -12,5 +12,9 @@ bin/.apollo-claude.tmp.*
 # Docker / collector runtime
 collector/data/
 
+# Credentials — never commit
+collector/htpasswd
+collector/.env
+
 # Claude Code local settings
 .claude/
