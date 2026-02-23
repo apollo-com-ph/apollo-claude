@@ -6,14 +6,13 @@ set -euo pipefail
 ############################################################
 usage() {
   cat <<EOF
-Usage: $0 [--help] [--verbose] [--debug]
+Usage: $0 [--help] [--verbose]
 
 Sets up OTEL telemetry for all Claude Code usage (CLI, VS Code, JetBrains).
 
 Options:
   --help      Show this help message and exit
   --verbose   Enable verbose output
-  --debug     Enable debug output (implies verbose)
 
 Environment variables:
   GITHUB_URL  Override the GitHub URL for apollotech-otel-headers.sh
@@ -24,21 +23,14 @@ EOF
 # Logging helpers
 ############################################################
 VERBOSE=0
-DEBUG=0
 
 info() {
   echo "$@"
 }
 
 log() {
-  if [ "$VERBOSE" -eq 1 ] || [ "$DEBUG" -eq 1 ]; then
+  if [ "$VERBOSE" -eq 1 ]; then
     echo "$@"
-  fi
-}
-
-debug() {
-  if [ "$DEBUG" -eq 1 ]; then
-    echo "[DEBUG] $@"
   fi
 }
 
@@ -64,8 +56,6 @@ for arg in "$@"; do
       usage; exit 0;;
     --verbose)
       VERBOSE=1;;
-    --debug)
-      DEBUG=1; VERBOSE=1;;
     *)
       echo "Unknown argument: $arg" >&2; usage; exit 2;;
   esac
