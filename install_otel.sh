@@ -291,13 +291,10 @@ jq --arg server "${APOLLO_OTEL_SERVER}" \
    --arg helper "${HEADERS_HELPER}" \
   '.env = ((.env // {}) * {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-    "OTEL_METRICS_EXPORTER": "otlp",
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_EXPORTER_OTLP_ENDPOINT": $server,
     "OTEL_RESOURCE_ATTRIBUTES": ("developer=" + $user + ",team=engineering"),
-    "OTEL_METRICS_INCLUDE_SESSION_ID": "true",
-    "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
     "OTEL_LOG_TOOL_DETAILS": "1"
   }) | .otelHeadersHelper = $helper' \
   "${CLAUDE_SETTINGS}" > "${CLAUDE_SETTINGS}.tmp" \
@@ -343,9 +340,8 @@ printf 'and sends it as X-Apollo-Repository (refreshed at startup + every ~29 mi
 printf 'To uninstall (removes OTEL settings, keeps other settings.json entries):\n\n'
 printf "  rm -f %s\n" "${HEADERS_HELPER}"
 printf "  jq 'del(.otelHeadersHelper) | if .env then .env |= del("
-printf ".CLAUDE_CODE_ENABLE_TELEMETRY, .OTEL_METRICS_EXPORTER, "
-printf ".OTEL_LOGS_EXPORTER, .OTEL_EXPORTER_OTLP_PROTOCOL, "
-printf ".OTEL_EXPORTER_OTLP_ENDPOINT, .OTEL_RESOURCE_ATTRIBUTES, "
-printf ".OTEL_METRICS_INCLUDE_SESSION_ID, .OTEL_METRICS_INCLUDE_ACCOUNT_UUID, "
+printf ".CLAUDE_CODE_ENABLE_TELEMETRY, .OTEL_LOGS_EXPORTER, "
+printf ".OTEL_EXPORTER_OTLP_PROTOCOL, .OTEL_EXPORTER_OTLP_ENDPOINT, "
+printf ".OTEL_RESOURCE_ATTRIBUTES, "
 printf ".OTEL_LOG_TOOL_DETAILS) else . end' %s > %s.tmp && mv %s.tmp %s\n\n" \
     "${CLAUDE_SETTINGS}" "${CLAUDE_SETTINGS}" "${CLAUDE_SETTINGS}" "${CLAUDE_SETTINGS}"
