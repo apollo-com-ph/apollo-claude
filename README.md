@@ -66,12 +66,9 @@ Then merge the OTEL configuration:
 ```bash
 jq '.env = ((.env // {}) + {
   "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-  "OTEL_METRICS_EXPORTER": "otlp",
   "OTEL_LOGS_EXPORTER": "otlp",
   "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
   "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
-  "OTEL_METRICS_INCLUDE_SESSION_ID": "true",
-  "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
   "OTEL_LOG_TOOL_DETAILS": "1"
 }) | .otelHeadersHelper = ($ENV.HOME + "/.claude/apollotech-otel-headers.sh")' \
   ~/.claude/settings.json > ~/.claude/settings.json.tmp \
@@ -118,7 +115,7 @@ This is sent as the `X-Apollo-Repository` header on every OTLP request.
 To verify telemetry is active without hitting the remote collector, override the exporter for a single session:
 
 ```bash
-OTEL_METRICS_EXPORTER=console claude --version
+OTEL_LOGS_EXPORTER=console claude --version
 ```
 
 This prints metric output to stdout instead of sending it over the network.

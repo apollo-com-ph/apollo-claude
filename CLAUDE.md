@@ -78,9 +78,9 @@ bash -n install_collector.sh
 cd collector && docker compose up -d
 ```
 
-**Debug telemetry locally (prints metrics to terminal instead of sending):**
+**Debug telemetry locally (prints logs to terminal instead of sending):**
 ```sh
-OTEL_METRICS_EXPORTER=console claude --version
+OTEL_LOGS_EXPORTER=console claude --version
 ```
 
 ## Commit Rules
