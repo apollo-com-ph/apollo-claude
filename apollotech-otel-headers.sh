@@ -38,7 +38,7 @@ _repo=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree &>/dev/null; then
     _remote_url="$(git remote get-url origin 2>/dev/null || true)"
     if [[ -n "${_remote_url}" ]]; then
-        _repo="$(echo "${_remote_url}" | sed -E 's|.*[:/]([^/]+/[^/]+)$|\1|; s|\.git$||')"
+        _repo="$(printf '%s\n' "${_remote_url}" | sed -E 's|.*[:/]([^/]+/[^/]+)$|\1|; s|\.git$||')"
     fi
     if [[ -z "${_repo}" ]]; then
         _git_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
