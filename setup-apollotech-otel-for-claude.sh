@@ -182,16 +182,22 @@ prompt_for_config() {
       else
         AUTH=$(echo -n "$APOLLO_USER:$APOLLO_OTEL_TOKEN" | base64)
       fi
-      RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Basic $AUTH" https://dev-ai.apollotech.co/otel/v1/metrics)
+      RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Basic $AUTH" \
+        -H "Content-Type: application/x-protobuf" \
+        https://dev-ai.apollotech.co/otel/v1/metrics)
       CURL_EXIT=$?
       if [ $CURL_EXIT -ne 0 ]; then
         echo "Network error: Unable to reach OTEL endpoint. Please check your connection and try again."
         continue
       fi
-      if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "204" ]; then
+      # 200/204 = accepted; 400 = auth passed but empty body rejected (expected)
+      if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "204" ] || [ "$RESPONSE" = "400" ]; then
         break
-      else
+      elif [ "$RESPONSE" = "401" ] || [ "$RESPONSE" = "403" ]; then
         echo "Credentials not accepted by OTEL server (HTTP $RESPONSE). Please try again."
+      else
+        echo "Unexpected response from OTEL server (HTTP $RESPONSE). Please try again."
       fi
     else
       echo "OTEL token cannot be empty. Please try again."
