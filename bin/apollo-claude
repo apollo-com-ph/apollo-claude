@@ -334,15 +334,12 @@ fi
 # ---------------------------------------------------------------------------
 
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_METRICS_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT="${APOLLO_OTEL_SERVER:-https://dev-ai.apollotech.co/otel}"
 _basic="$(printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${APOLLO_USER}" "${APOLLO_OTEL_TOKEN}" | base64 | tr -d '\n')"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${_basic}"
 export OTEL_RESOURCE_ATTRIBUTES="developer=${APOLLO_USER},team=engineering,repository=${REPO}"
-export OTEL_METRICS_INCLUDE_SESSION_ID=true
-export OTEL_METRICS_INCLUDE_ACCOUNT_UUID=true
 export OTEL_LOG_TOOL_DETAILS=1
 
 # ---------------------------------------------------------------------------
