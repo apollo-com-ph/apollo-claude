@@ -21,10 +21,14 @@ EOF
 }
 
 ############################################################
-# Globals for verbosity/debug
+# Logging helpers
 ############################################################
 VERBOSE=0
 DEBUG=0
+
+info() {
+  echo "$@"
+}
 
 log() {
   if [ "$VERBOSE" -eq 1 ] || [ "$DEBUG" -eq 1 ]; then
@@ -51,44 +55,6 @@ expand_path() {
   esac
 }
 
-# Simple OTEL Setup Script for Default Claude
-# This script enables OTEL telemetry for the default claude CLI.
-# It checks for dependencies, configures OTEL variables, updates global settings, and ensures idempotency.
-
-# --- Dependency Check ---
-############################################################
-# Dependency Check
-############################################################
-
-check_deps() {
-  local missing=""
-  for dep in bash claude jq base64; do
-    if ! command -v "$dep" >/dev/null 2>&1; then
-      missing="$missing $dep"
-    fi
-  done
-  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-    missing="$missing curl-or-wget"
-  fi
-  for dep in date chmod cp mkdir; do
-    if ! command -v "$dep" >/dev/null 2>&1; then
-      missing="$missing $dep"
-    fi
-  done
-  if [ -n "$missing" ]; then
-    fail 10 "Missing dependencies:$missing. Please install the required tools and try again."
-  fi
-}
-
-############################################################
-# Atomic file write
-############################################################
-atomic_write() {
-  local src="$1"
-  local dest="$2"
-  mv "$src" "$dest"
-}
-
 ############################################################
 # Parse arguments
 ############################################################
@@ -105,9 +71,78 @@ for arg in "$@"; do
   esac
 done
 
+############################################################
+# Dependency Check
+############################################################
+
+# Compare two dot-separated version strings; returns 0 if $1 >= $2
+version_gte() {
+  local a="$1" b="$2"
+  # Compare field by field
+  while [ -n "$a" ] || [ -n "$b" ]; do
+    local a_field b_field
+    a_field="${a%%.*}"; a="${a#"$a_field"}"; a="${a#.}"
+    b_field="${b%%.*}"; b="${b#"$b_field"}"; b="${b#.}"
+    a_field="${a_field:-0}"; b_field="${b_field:-0}"
+    [ "$a_field" -gt "$b_field" ] && return 0
+    [ "$a_field" -lt "$b_field" ] && return 1
+  done
+  return 0  # equal
+}
+
+check_deps() {
+  info "Checking dependencies..."
+  local missing=""
+
+  for dep in bash claude jq base64; do
+    if ! command -v "$dep" >/dev/null 2>&1; then
+      missing="$missing $dep"
+    else
+      log "  $dep: found ($(command -v "$dep"))"
+    fi
+  done
+
+  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+    missing="$missing curl-or-wget"
+  else
+    command -v curl >/dev/null 2>&1 && log "  curl: found" || log "  wget: found"
+  fi
+
+  for dep in date chmod cp mkdir; do
+    if ! command -v "$dep" >/dev/null 2>&1; then
+      missing="$missing $dep"
+    else
+      log "  $dep: found"
+    fi
+  done
+
+  if [ -n "$missing" ]; then
+    fail 10 "Missing dependencies:$missing. Please install the required tools and try again."
+  fi
+
+  # Version check: jq >= 1.6 (--argjson required)
+  local jq_raw jq_ver
+  jq_raw=$(jq --version 2>/dev/null || true)            # e.g. "jq-1.7.1"
+  jq_ver="${jq_raw#jq-}"                                 # e.g. "1.7.1"
+  if ! version_gte "$jq_ver" "1.6"; then
+    fail 11 "jq >= 1.6 required (found $jq_raw). Please upgrade jq and try again."
+  fi
+  log "  jq: $jq_raw (>= 1.6 OK)"
+
+  info "All dependencies satisfied."
+}
+
+############################################################
+# Atomic file write
+############################################################
+atomic_write() {
+  local src="$1"
+  local dest="$2"
+  mv "$src" "$dest"
+}
+
 check_deps
 
-# --- Config Paths ---
 ############################################################
 # Config Paths
 ############################################################
@@ -118,9 +153,9 @@ HEADERS_SH_ABS=$(expand_path "$HEADERS_SH")
 CONFIG="$CLAUDE_DIR/apollotech-config"
 CONFIG_BAK="$CONFIG.bak_$(date +%Y%m%d_%H%M%S)"
 
+info "Using config directory: $CLAUDE_DIR"
 mkdir -p "$CLAUDE_DIR"
 
-# --- OTEL Headers Helper Setup ---
 ############################################################
 # OTEL Headers Helper Setup
 ############################################################
@@ -128,7 +163,8 @@ mkdir -p "$CLAUDE_DIR"
 download_and_validate_helper() {
   local url="${GITHUB_URL:-https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/refs/heads/main/apollotech-otel-headers.sh}"
   local dest="$1"
-  log "Downloading apollotech-otel-headers.sh from $url ..."
+  info "Downloading apollotech-otel-headers.sh..."
+  log "  URL: $url"
   local tmpfile
   tmpfile="${dest}.tmp.$$"
   if command -v curl >/dev/null 2>&1; then
@@ -152,14 +188,15 @@ download_and_validate_helper() {
   fi
   chmod +x "$tmpfile"
   atomic_write "$tmpfile" "$dest"
-  log "Downloaded $dest from $url and validated."
+  info "Headers helper installed: $dest"
 }
 
 if [ ! -f "$HEADERS_SH" ]; then
   download_and_validate_helper "$HEADERS_SH"
+else
+  info "Headers helper already present: $HEADERS_SH"
 fi
 
-# --- Prompt for missing config ---
 ############################################################
 # Prompt for missing config
 ############################################################
@@ -177,6 +214,7 @@ prompt_for_config() {
     read -s -p "APOLLO_OTEL_TOKEN: " APOLLO_OTEL_TOKEN
     echo
     if [ -n "$APOLLO_OTEL_TOKEN" ]; then
+      info "Validating credentials against OTEL server..."
       if base64 --help 2>&1 | grep -q -- '-w '; then
         AUTH=$(echo -n "$APOLLO_USER:$APOLLO_OTEL_TOKEN" | base64 -w 0)
       else
@@ -191,10 +229,12 @@ prompt_for_config() {
         echo "Network error: Unable to reach OTEL endpoint. Please check your connection and try again."
         continue
       fi
+      log "  Server response: HTTP $RESPONSE"
       # 401/403 = bad credentials; anything else means auth passed
       if [ "$RESPONSE" = "401" ] || [ "$RESPONSE" = "403" ]; then
         echo "Credentials not accepted by OTEL server (HTTP $RESPONSE). Please try again."
       else
+        info "Credentials validated (HTTP $RESPONSE)."
         break
       fi
     else
@@ -203,7 +243,7 @@ prompt_for_config() {
   done
   if [ -f "$CONFIG" ]; then
     cp "$CONFIG" "$CONFIG_BAK"
-    echo "Backed up $CONFIG to $CONFIG_BAK"
+    info "Backed up existing config: $CONFIG_BAK"
   fi
   local tmpcfg
   tmpcfg="${CONFIG}.tmp.$$"
@@ -211,21 +251,18 @@ prompt_for_config() {
   echo "APOLLO_OTEL_TOKEN=$APOLLO_OTEL_TOKEN" >> "$tmpcfg"
   chmod 600 "$tmpcfg"
   atomic_write "$tmpcfg" "$CONFIG"
-  echo "Created $CONFIG"
+  info "Credentials saved: $CONFIG"
 }
 
 if [ ! -f "$CONFIG" ]; then
   prompt_for_config
+else
+  info "Config already present: $CONFIG"
 fi
 
-# --- Backup settings.json ---
-if [ -f "$SETTINGS_JSON" ]; then
-  TS=$(date +%Y%m%d_%H%M%S)
-  cp "$SETTINGS_JSON" "$SETTINGS_JSON.bak_$TS"
-  echo "Backed up $SETTINGS_JSON to $SETTINGS_JSON.bak_$TS"
-fi
-
-# --- OTEL Environment Variables ---
+############################################################
+# OTEL Environment Variables
+############################################################
 OTEL_ENV='{
   "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
   "OTEL_METRICS_EXPORTER": "otlp",
@@ -237,25 +274,30 @@ OTEL_ENV='{
   "OTEL_LOG_TOOL_DETAILS": "1"
 }'
 
-# --- Update settings.json ---
 ############################################################
 # Update settings.json
 ############################################################
 update_settings_json() {
   if [ -f "$SETTINGS_JSON" ]; then
+    info "Updating $SETTINGS_JSON..."
     if jq empty "$SETTINGS_JSON" >/dev/null 2>&1; then
       local tmpjson
       tmpjson="${SETTINGS_JSON}.tmp.$$"
+      local bak
+      bak="$SETTINGS_JSON.bak_$(date +%Y%m%d_%H%M%S)"
+      cp "$SETTINGS_JSON" "$bak"
+      info "Backed up settings.json: $bak"
       jq \
         --argjson otelenv "$OTEL_ENV" \
         --arg helper "$HEADERS_SH_ABS" \
         '.env = ((.env // {}) + $otelenv) | .otelHeadersHelper = $helper' "$SETTINGS_JSON" > "$tmpjson" || fail 30 "Failed to update settings.json."
       atomic_write "$tmpjson" "$SETTINGS_JSON"
-      echo "settings.json updated (env merged)."
+      info "settings.json updated."
     else
-      echo "Warning: $SETTINGS_JSON is not valid JSON. Manual intervention required."
+      echo "Warning: $SETTINGS_JSON is not valid JSON. Manual intervention required." >&2
     fi
   else
+    info "Creating $SETTINGS_JSON..."
     local tmpjson
     tmpjson="${SETTINGS_JSON}.tmp.$$"
     cat > "$tmpjson" <<EOF
@@ -265,26 +307,30 @@ update_settings_json() {
 }
 EOF
     atomic_write "$tmpjson" "$SETTINGS_JSON"
-    echo "settings.json created."
+    info "settings.json created."
   fi
 }
 
 update_settings_json
 
-# --- User Feedback ---
 ############################################################
-# User Feedback
+# Permissions
 ############################################################
+info "Setting file permissions..."
 chmod 600 "$CONFIG"
 chmod 700 "$HEADERS_SH"
+log "  $CONFIG: 600"
+log "  $HEADERS_SH: 700"
+
+############################################################
+# Summary
+############################################################
 echo ""
-echo "OTEL telemetry enabled for Claude CLI."
-if [ -f "$CONFIG_BAK" ]; then
-  echo "apollotech-config backed up to $CONFIG_BAK"
-fi
-echo "settings.json location: $SETTINGS_JSON"
-echo "otelHeadersHelper set to $HEADERS_SH_ABS"
-echo "env variables configured."
-if [ -f "$CONFIG" ]; then
-  echo "Credentials validated and saved."
-fi
+echo "Setup complete. OTEL telemetry enabled for Claude CLI."
+echo ""
+echo "  Config:           $CONFIG"
+echo "  Headers helper:   $HEADERS_SH_ABS"
+echo "  settings.json:    $SETTINGS_JSON"
+echo "  OTLP endpoint:    https://dev-ai.apollotech.co/otel"
+echo ""
+echo "Restart Claude Code (or start a new session) to apply."
