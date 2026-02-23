@@ -46,7 +46,7 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Loki, G
 
 ## Key Files
 
-- `setup-apollotech-otel-for-claude.sh` — primary installer (bash). Checks deps, validates credentials, downloads `apollotech-otel-headers.sh`, saves `~/.claude/apollotech-config`, and merges OTEL settings into `~/.claude/settings.json`. Supports `--verbose` and `--debug` flags.
+- `setup-apollotech-otel-for-claude.sh` — primary installer (bash). Checks deps, validates credentials, downloads `apollotech-otel-headers.sh`, saves `~/.claude/apollotech-config`, and merges OTEL settings into `~/.claude/settings.json`. Supports a `--verbose` flag for detailed output.
 - `apollotech-otel-headers.sh` — auth + repo-detection helper. Installed to `~/.claude/apollotech-otel-headers.sh` by the setup script. Reads `~/.claude/apollotech-config`, detects git repo from CWD, and outputs `{"Authorization": "Basic <base64>", "X-Apollo-Repository": "org/repo"}` JSON. Called by Claude Code's `otelHeadersHelper` setting at startup + every ~29 min.
 - `install_collector.sh` — automated collector stack installer (bash, Ubuntu-only). Handles OS validation, packages, Docker, UFW, repo clone, nginx, TLS, and first developer provisioning in one script.
 - `collector/` — self-hosted OTel backend (docker-compose stack, nginx reverse proxy). Defense-in-depth filtering strips prompt/completion content at the collector level.

@@ -23,7 +23,7 @@ The installer will:
 
 After running, telemetry is active for all Claude Code usage — VS Code extension, JetBrains plugin, and the bare `claude` CLI — with no wrapper or extra command needed. Safe to re-run.
 
-Optional flags: `--verbose` for detailed output, `--debug` for full trace.
+Optional flag: `--verbose` for detailed output.
 
 ## Manual install
 
