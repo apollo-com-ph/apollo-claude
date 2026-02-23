@@ -36,13 +36,13 @@ Optional CLI wrapper path (bin/apollo-claude):
     → exec claude "$@"
 ```
 
-**Primary telemetry pipeline:** Claude Code → OTLP HTTP (`/otel/v1/*`) → Nginx → OTel Collector (dev-ai.apollotech.co) → Prometheus → Grafana (`/grafana`)
+**Primary telemetry pipeline:** Claude Code → OTLP HTTP (`/otel/v1/*`) → Nginx → OTel Collector (dev-ai.apollotech.co) → Loki → Grafana (`/grafana`)
 
 **Auth isolation (wrapper only):** `CLAUDE_CONFIG_DIR` is set to `~/.apollo-claude/`, so Claude's auth tokens (`.credentials.json`) are stored separately from `~/.claude/`. This prevents Apollo's subscription from leaking to plain `claude` usage.
 
 **HTTP helpers (wrapper only):** `_fetch_stdout` and `_fetch_to_file` abstract curl vs wget. All wrapper network calls (auto-update, version check) go through these helpers, preferring curl with wget as fallback.
 
-The collector stack in `collector/` (docker-compose with OTel Collector, Prometheus, Grafana) is the self-hosted backend — it's separate from the installers and deployed independently.
+The collector stack in `collector/` (docker-compose with OTel Collector, Loki, Grafana) is the self-hosted backend — it's separate from the installers and deployed independently.
 
 ## Key Files
 

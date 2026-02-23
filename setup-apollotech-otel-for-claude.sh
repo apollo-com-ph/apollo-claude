@@ -8,7 +8,7 @@ usage() {
   cat <<EOF
 Usage: $0 [--help] [--verbose] [--debug]
 
-Sets up OTEL telemetry for Claude CLI.
+Sets up OTEL telemetry for all Claude Code usage (CLI, VS Code, JetBrains).
 
 Options:
   --help      Show this help message and exit

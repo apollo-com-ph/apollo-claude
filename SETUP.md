@@ -1,6 +1,6 @@
 # OTel Collector Setup
 
-The `collector/` directory contains a Docker Compose stack that receives telemetry from `apollo-claude` wrappers and makes it available in Grafana dashboards. This guide covers provisioning a fresh Ubuntu server to run the full stack.
+The `collector/` directory contains a Docker Compose stack that receives telemetry from Claude Code sessions and makes it available in Grafana dashboards. This guide covers provisioning a fresh Ubuntu server to run the full stack.
 
 ## Quick install
 
@@ -16,8 +16,8 @@ It handles everything below (packages, Docker, firewall, nginx, TLS, first devel
 
 | Service | Image / Package | Port (localhost) | Purpose |
 |---------|----------------|------------------|---------|
-| OTel Collector | `otel/opentelemetry-collector-contrib:0.116.0` | 4318 (OTLP HTTP), 8889 (Prometheus scrape), 13133 (health) | Receives metrics and logs from wrappers, exports to Prometheus and file |
-| Prometheus | `prom/prometheus:v2.55.1` | 9090 | Stores metrics (90-day retention) |
+| OTel Collector | `otel/opentelemetry-collector-contrib:0.146.1` | 4318 (OTLP HTTP), 13133 (health) | Receives logs from Claude Code sessions, authenticates via htpasswd, exports to Loki |
+| Loki | `grafana/loki:3.3.2` | 3100 | Log storage, queryable by Grafana |
 | Grafana | `grafana/grafana:11.4.0` | 3000 | Dashboards and alerting |
 | Nginx | system package | 80, 443 | TLS termination and reverse proxy |
 | Certbot | system package | — | Let's Encrypt certificate auto-renewal |
@@ -173,12 +173,11 @@ To revoke a developer, remove their line from `htpasswd` and restart.
 ## Data pipeline
 
 ```
-apollo-claude wrappers
+Claude Code sessions (CLI, VS Code, JetBrains)
   → HTTPS /otel/v1/* (nginx, TLS via Let's Encrypt)
   → OTLP HTTP (port 4318, basic auth via htpasswd)
   → OTel Collector
-      ├─ metrics → Prometheus scrape endpoint (:8889) → Prometheus → Grafana
-      └─ logs   → /var/log/otel/claude-events.jsonl (rotated, 100MB/30d)
+      └─ logs → Loki (port 3100) → Grafana
 ```
 
 ## Privacy
@@ -187,11 +186,9 @@ The collector applies defence-in-depth filtering — the `attributes` processor 
 
 ## Customization
 
-**Remote forwarding**: To forward telemetry to a central OTLP backend, uncomment the `otlp/remote` exporter in `otel-collector-config.yaml` and add it to the relevant pipeline.
+**Remote forwarding**: To forward telemetry to a central OTLP backend, add an `otlp` exporter in `otel-collector-config.yaml` and include it in the logs pipeline.
 
-**Retention**: Prometheus retention is set to 90 days via `--storage.tsdb.retention.time=90d` in `docker-compose.yml`.
-
-**Log rotation**: File logs rotate at 100MB with 5 backups kept for 30 days, configured in the `file` exporter.
+**Retention**: Loki retention is configured in `loki-config.yaml`.
 
 ## Maintenance
 

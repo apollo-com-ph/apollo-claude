@@ -160,7 +160,7 @@ curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/in
 
 ## Self-hosted collector
 
-`collector/` contains the OTel backend stack (OTel Collector + Prometheus + Grafana). To deploy on a fresh Ubuntu 22.04+ server, run `bash install_collector.sh` — it automates the full setup (packages, Docker, firewall, nginx, TLS, first developer). See [SETUP.md](./SETUP.md) for manual deployment instructions.
+`collector/` contains the OTel backend stack (OTel Collector + Loki + Grafana). To deploy on a fresh Ubuntu 22.04+ server, run `bash install_collector.sh` — it automates the full setup (packages, Docker, firewall, nginx, TLS, first developer). See [SETUP.md](./SETUP.md) for manual deployment instructions.
 
 ## Project structure
 
@@ -169,11 +169,11 @@ apollo-claude/
 ├── setup-apollotech-otel-for-claude.sh  # Primary installer
 ├── apollotech-otel-headers.sh           # Auth + repo-detection helper (downloaded to ~/.claude/)
 ├── collector/
-│   ├── docker-compose.yml               # OTel Collector + Prometheus + Grafana
+│   ├── docker-compose.yml               # OTel Collector + Loki + Grafana
 │   ├── htpasswd                         # Per-developer credentials (basic auth)
 │   ├── nginx-site.conf                  # Nginx reverse proxy template
 │   ├── otel-collector-config.yaml
-│   └── prometheus.yml
+│   └── loki-config.yaml
 ├── bin/
 │   └── apollo-claude                    # Optional CLI wrapper
 ├── install.sh                           # Installer for the optional CLI wrapper
