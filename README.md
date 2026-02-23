@@ -1,28 +1,29 @@
 # apollo-claude
 
-A thin wrapper around [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that injects OpenTelemetry telemetry, giving ApolloTech engineering visibility into Claude Code usage across the team — by developer, repo, and model. **No prompt or response content is ever collected.**
+OpenTelemetry telemetry for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), giving ApolloTech engineering visibility into Claude Code usage across the team — by developer, repo, and model. **No prompt or response content is ever collected.**
 
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh | bash
 ```
 
 Or with wget:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh | bash
 ```
 
 The installer will:
-- Check that `claude` is installed (and tell you how to get it if not)
-- Download the wrapper to `~/.local/bin/apollo-claude`
-- Validate the download (shebang check + `bash -n` syntax check)
-- Add `~/.local/bin` to your PATH (in `~/.zshrc` or `~/.bashrc`)
+- Check that `claude` and all required dependencies are installed (`jq` ≥ 1.6, `base64`, `curl`/`wget`, and coreutils)
+- Prompt for your credentials and validate them against the collector
+- Download `apollotech-otel-headers.sh` to `~/.claude/` (the auth helper called by Claude Code)
+- Save credentials to `~/.claude/apollotech-config`
+- Merge OTEL settings into `~/.claude/settings.json`, backing up any existing file first
 
-On first run, `apollo-claude` will prompt for your credentials and write `~/.apollo-claude/config`.
+After running, telemetry is active for all Claude Code usage — VS Code extension, JetBrains plugin, and the bare `claude` CLI — with no wrapper or extra command needed. Safe to re-run.
 
-Safe to re-run — existing PATH entries are not duplicated.
+Optional flags: `--verbose` for detailed output, `--debug` for full trace.
 
 ## Manual install
 
@@ -36,105 +37,54 @@ Ask your team lead for your personal token. You'll need:
 ### 2. Create the config file
 
 ```bash
-mkdir -p ~/.apollo-claude
-cat > ~/.apollo-claude/config <<'EOF'
+mkdir -p ~/.claude
+cat > ~/.claude/apollotech-config <<'EOF'
 APOLLO_USER=you@company.com
 APOLLO_OTEL_TOKEN=at_xxxxxxxxxxxx
-APOLLO_OTEL_SERVER=https://dev-ai.apollotech.co/otel
 EOF
+chmod 600 ~/.claude/apollotech-config
 ```
 
-Replace `you@company.com`, `at_xxxxxxxxxxxx`, and optionally the server URL with the values for your team.
-
-The config file is only readable by you (`chmod 600` is recommended):
+### 3. Download the headers helper
 
 ```bash
-chmod 600 ~/.apollo-claude/config
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/apollotech-otel-headers.sh \
+  -o ~/.claude/apollotech-otel-headers.sh
+chmod 700 ~/.claude/apollotech-otel-headers.sh
 ```
 
-### 3. Add `apollo-claude` to your PATH
+### 4. Update settings.json
 
-**Option A — symlink into an existing PATH directory:**
+If `~/.claude/settings.json` doesn't exist yet, create it first:
 
 ```bash
-ln -sf /path/to/apollo-claude/bin/apollo-claude ~/.local/bin/apollo-claude
+echo '{}' > ~/.claude/settings.json
 ```
 
-**Option B — add the `bin/` directory to PATH:**
-
-Add to your `~/.bashrc` or `~/.zshrc`:
+Then merge the OTEL configuration:
 
 ```bash
-export PATH="/path/to/apollo-claude/bin:$PATH"
+jq '.env = ((.env // {}) + {
+  "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+  "OTEL_METRICS_EXPORTER": "otlp",
+  "OTEL_LOGS_EXPORTER": "otlp",
+  "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+  "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
+  "OTEL_METRICS_INCLUDE_SESSION_ID": "true",
+  "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
+  "OTEL_LOG_TOOL_DETAILS": "1"
+}) | .otelHeadersHelper = ($ENV.HOME + "/.claude/apollotech-otel-headers.sh")' \
+  ~/.claude/settings.json > ~/.claude/settings.json.tmp \
+  && mv ~/.claude/settings.json.tmp ~/.claude/settings.json
 ```
 
-Then reload your shell:
+### 5. Restart Claude Code
 
-```bash
-source ~/.bashrc   # or ~/.zshrc
-```
-
-### 4. Verify the setup
-
-```bash
-apollo-claude --wrapper-version
-```
-
-You should see the wrapper version (e.g. `apollo-claude version 1`). You can also run `apollo-claude --version` to see the underlying Claude version. If you see a "configuration required" message, check that `~/.apollo-claude/config` exists and contains both variables.
-
-## Telemetry for IDE plugins (VS Code / JetBrains)
-
-IDE plugins bypass the CLI wrapper, so `apollo-claude` alone won't capture telemetry from VS Code or JetBrains usage. A second installer configures Claude Code's global `settings.json` so **all** Claude Code usage gets telemetry — no wrapper needed.
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install_otel.sh | sh
-```
-
-Or with wget:
-
-```sh
-wget -qO- https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install_otel.sh | sh
-```
-
-This installer will:
-- Check dependencies (`bash`, `jq`, `curl`/`wget`, `base64`)
-- Collect your credentials (or reuse existing `~/.apollo-claude/config` if the CLI wrapper is already installed)
-- Create `~/.apollo-claude/otel-headers.sh` — an auth helper script called by Claude Code
-- Merge OTEL env vars into `~/.claude/settings.json` (preserving all existing settings)
-
-After running, telemetry is active for:
-- **VS Code** (Claude Code extension)
-- **JetBrains** (Claude Code plugin)
-- **CLI** (bare `claude` command)
-
-### Two install paths
-
-| Path | Command | Telemetry coverage |
-|------|---------|-------------------|
-| CLI wrapper | `install.sh` | `apollo-claude` CLI only (per-repo tagging via `OTEL_RESOURCE_ATTRIBUTES`) |
-| Global OTEL | `install_otel.sh` | All Claude Code usage: CLI, VS Code, JetBrains (per-repo tagging via `X-Apollo-Repository` header, refreshed every ~29 min) |
-
-Both share `~/.apollo-claude/config` for credentials. A dev who wants full coverage can run both.
+Open a new terminal or restart the VS Code/JetBrains extension. Metrics should appear in Grafana within a few minutes of starting a session.
 
 ## Day-to-day usage
 
-**Use `apollo-claude` for all Apollo repo work.** It behaves identically to `claude` — all flags and arguments pass through unchanged.
-
-```bash
-# Instead of:
-claude
-
-# Use:
-apollo-claude
-```
-
-The wrapper adds two flags of its own:
-- `--wrapper-version` — print the wrapper version and exit
-- `--self-update` — force an immediate update check and exit
-
-`apollo-claude` uses its own auth session, stored in `~/.apollo-claude/` (separate from `~/.claude/`). The first time you run the wrapper, you'll need to log in through it — this is a one-time step, independent of any personal `claude` login you may have.
-
-You can continue to use bare `claude` for personal projects — it uses its own auth in `~/.claude/` and no telemetry is injected.
+Just use `claude` normally — no wrapper or extra command needed. The OTEL settings are written into `~/.claude/settings.json` and apply to every Claude Code session automatically.
 
 ## What data is collected
 
@@ -155,42 +105,58 @@ Event logs (stored server-side) include per-API-request detail: model used, cost
 
 ## Repo detection
 
-The wrapper automatically detects the project context:
+Claude Code calls the headers helper at session start and approximately every 29 minutes. Each time, it detects the project context from the current working directory:
 
 - **Inside a git repo with a remote**: uses `org/repo` from the `origin` remote URL
 - **Inside a git repo without a remote**: uses the basename of the git root
 - **Not in a git repo**: uses the basename of the current directory
 
+This is sent as the `X-Apollo-Repository` header on every OTLP request.
+
 ## Local debugging
 
-To verify what OTel attributes are being sent without hitting the remote collector, you can temporarily override the exporter:
+To verify telemetry is active without hitting the remote collector, override the exporter for a single session:
 
 ```bash
-OTEL_METRICS_EXPORTER=console apollo-claude --version
+OTEL_METRICS_EXPORTER=console claude --version
 ```
 
 This prints metric output to stdout instead of sending it over the network.
 
 ## Troubleshooting
 
-**"configuration required" on every run**
-- Check that `~/.apollo-claude/config` exists
-- Check that both `APOLLO_USER` and `APOLLO_OTEL_TOKEN` are set (leading/trailing whitespace around `=` is fine)
-
-**`apollo-claude: command not found`**
-- Re-check your PATH setup (step 3 above)
-- Run `which apollo-claude` to confirm it's found
-
-**"not logged in" on every run**
-- `apollo-claude` has its own auth session separate from plain `claude`
-- Run `apollo-claude` and complete the login prompt — this only needs to happen once
-
 **Metrics not appearing in Grafana**
-- Confirm your credentials are correct — `APOLLO_USER` is the username, `APOLLO_OTEL_TOKEN` is the password (ask your team lead if unsure)
-- Test your credentials directly: `curl -u 'user:token' -X POST https://dev-ai.apollotech.co/otel/v1/metrics` — a `400` means auth is OK (empty body), `401` means bad credentials
-- Check connectivity: `curl -I https://dev-ai.apollotech.co` (or your custom `APOLLO_OTEL_SERVER` URL)
-- If your team uses a custom collector, ensure `APOLLO_OTEL_SERVER` is set correctly in `~/.apollo-claude/config`
-- Collector logs are available from the team if needed
+- Confirm your credentials are correct — test them directly:
+  ```sh
+  curl -u 'you@company.com:at_xxxxxxxxxxxx' -X POST https://dev-ai.apollotech.co/otel/v1/metrics
+  ```
+  A `400` response means auth is OK (empty body rejected). A `401` means bad credentials.
+- Check connectivity: `curl -I https://dev-ai.apollotech.co`
+- Confirm `~/.claude/apollotech-config` exists and contains both `APOLLO_USER` and `APOLLO_OTEL_TOKEN`
+- Confirm `~/.claude/settings.json` has `"CLAUDE_CODE_ENABLE_TELEMETRY": "1"` under `.env`
+- Restart Claude Code after any config changes — settings.json is only read at startup
+
+**jq not installed**
+```sh
+# macOS
+brew install jq
+# Ubuntu/Debian
+sudo apt install jq
+# Fedora
+sudo dnf install jq
+```
+Then re-run the installer.
+
+**claude not installed**
+Install Claude Code first: https://docs.anthropic.com/en/docs/claude-code/getting-started
+
+## Optional: CLI wrapper
+
+`install.sh` installs `apollo-claude`, a thin bash wrapper that also injects telemetry but with auth isolation — it stores Claude credentials in `~/.apollo-claude/` separately from `~/.claude/`, and includes an auto-update mechanism. Most developers don't need this; use it only if you need a separate Claude auth session (e.g. a team subscription billed separately from personal usage).
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install.sh | sh
+```
 
 ## Self-hosted collector
 
@@ -200,18 +166,20 @@ This prints metric output to stdout instead of sending it over the network.
 
 ```
 apollo-claude/
-├── bin/
-│   └── apollo-claude          # The wrapper script
+├── setup-apollotech-otel-for-claude.sh  # Primary installer
+├── apollotech-otel-headers.sh           # Auth + repo-detection helper (downloaded to ~/.claude/)
 ├── collector/
-│   ├── docker-compose.yml     # OTel + Prometheus + Grafana (localhost-only ports)
-│   ├── htpasswd               # Per-developer credentials (basic auth)
-│   ├── nginx-site.conf        # Nginx reverse proxy template
+│   ├── docker-compose.yml               # OTel Collector + Prometheus + Grafana
+│   ├── htpasswd                         # Per-developer credentials (basic auth)
+│   ├── nginx-site.conf                  # Nginx reverse proxy template
 │   ├── otel-collector-config.yaml
 │   └── prometheus.yml
-├── install.sh                 # One-liner installer (CLI wrapper)
-├── install_otel.sh            # One-liner installer (global OTEL for IDE plugins)
-├── install_collector.sh       # Automated collector stack installer
-├── CLAUDE.md                  # Claude Code guidance
-├── VERSION                    # Wrapper version (synced with APOLLO_CLAUDE_VERSION)
-└── SETUP.md                   # Ubuntu server deployment guide
+├── bin/
+│   └── apollo-claude                    # Optional CLI wrapper
+├── install.sh                           # Installer for the optional CLI wrapper
+├── install_otel.sh                      # Alternative global OTEL installer
+├── install_collector.sh                 # Automated collector stack installer
+├── CLAUDE.md
+├── VERSION
+└── SETUP.md
 ```
