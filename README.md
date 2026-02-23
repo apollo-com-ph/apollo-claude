@@ -149,10 +149,10 @@ Install Claude Code first: https://docs.anthropic.com/en/docs/claude-code/gettin
 
 ## Optional: CLI wrapper
 
-`install.sh` installs `apollo-claude`, a thin bash wrapper that also injects telemetry but with auth isolation — it stores Claude credentials in `~/.apollo-claude/` separately from `~/.claude/`, and includes an auto-update mechanism. Most developers don't need this; use it only if you need a separate Claude auth session (e.g. a team subscription billed separately from personal usage).
+`install-apollo-claude-wrapper.sh` installs `apollo-claude`, a thin bash wrapper that also injects telemetry but with auth isolation — it stores Claude credentials in `~/.apollo-claude/` separately from `~/.claude/`, and includes an auto-update mechanism. Most developers don't need this; use it only if you need a separate Claude auth session (e.g. a team subscription billed separately from personal usage).
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install-apollo-claude-wrapper.sh | sh
 ```
 
 ## Self-hosted collector
@@ -173,8 +173,7 @@ apollo-claude/
 │   └── loki-config.yaml
 ├── bin/
 │   └── apollo-claude                    # Optional CLI wrapper
-├── install.sh                           # Installer for the optional CLI wrapper
-├── install_otel.sh                      # Alternative global OTEL installer
+├── install-apollo-claude-wrapper.sh     # Installer for the optional CLI wrapper
 ├── install_collector.sh                 # Automated collector stack installer
 ├── CLAUDE.md
 ├── VERSION

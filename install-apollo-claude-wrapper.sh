@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
-# install.sh — one-liner installer for apollo-claude
+# install-apollo-claude-wrapper.sh — one-liner installer for the apollo-claude CLI wrapper
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install-apollo-claude-wrapper.sh | sh
 #
 # What it does:
 #   1. Checks that `claude` is installed
@@ -169,5 +169,5 @@ printf '       source %s\n' "${RC_FILE}"
 printf '  2. Run apollo-claude — it will prompt for your credentials on first use:\n'
 printf '       apollo-claude\n\n'
 printf '  Tip: To also enable telemetry in VS Code / JetBrains, run:\n'
-printf '         curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install_otel.sh | sh\n'
+printf '         curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh | bash\n'
 printf '\n'

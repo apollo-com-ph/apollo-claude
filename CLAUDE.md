@@ -54,9 +54,8 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Loki, G
 - `collector/nginx-site.conf` — nginx site config template for TLS termination and path-based reverse proxy (`/otel/v1/*` → collector, `/grafana/*` → Grafana).
 - `README.md` — developer-facing: install, usage, troubleshooting.
 - `SETUP.md` — OTel collector deployment guide.
-- `bin/apollo-claude` — optional CLI wrapper (bash). Installed to `~/.local/bin/apollo-claude` by `install.sh`. Provides auth isolation and auto-update; most developers don't need this.
-- `install.sh` — one-liner installer for the optional CLI wrapper. Uses POSIX `sh` for portability.
-- `install_otel.sh` — alternative global OTEL installer. Uses POSIX `sh`. Writes to `~/.apollo-claude/` instead of `~/.claude/`. Shares config with the CLI wrapper.
+- `bin/apollo-claude` — optional CLI wrapper (bash). Installed to `~/.local/bin/apollo-claude` by `install-apollo-claude-wrapper.sh`. Provides auth isolation and auto-update; most developers don't need this.
+- `install-apollo-claude-wrapper.sh` — one-liner installer for the optional CLI wrapper. Uses POSIX `sh` for portability.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 
 ## Development
@@ -68,8 +67,7 @@ There is no build step, test suite, or linter. The project is shell scripts.
 bash -n setup-apollotech-otel-for-claude.sh
 bash -n apollotech-otel-headers.sh
 bash -n bin/apollo-claude
-sh -n install.sh
-sh -n install_otel.sh
+sh -n install-apollo-claude-wrapper.sh
 bash -n install_collector.sh
 ```
 
@@ -90,7 +88,7 @@ OTEL_LOGS_EXPORTER=console claude --version
 
 ## Conventions
 
-- `setup-apollotech-otel-for-claude.sh`, `apollotech-otel-headers.sh`, and `bin/apollo-claude` use `set -euo pipefail` and bash. `install.sh` and `install_otel.sh` use `set -eu` and POSIX sh.
+- `setup-apollotech-otel-for-claude.sh`, `apollotech-otel-headers.sh`, and `bin/apollo-claude` use `set -euo pipefail` and bash. `install-apollo-claude-wrapper.sh` uses `set -eu` and POSIX sh.
 - Config is read via line-by-line `IFS='=' read`, not `source`, to avoid executing arbitrary code. Only `APOLLO_*` keys are processed; other keys are silently ignored. Leading/trailing whitespace on keys and values is trimmed.
 - `settings.json` is always updated via a `jq` merge into a temp file followed by atomic `mv` — never written directly, and always backed up first.
 - Downloaded helpers (e.g. `apollotech-otel-headers.sh`) are validated before install: non-empty, bash shebang present, `bash -n` syntax check passes.
@@ -135,7 +133,7 @@ Written by `setup-apollotech-otel-for-claude.sh`. Read by `apollotech-otel-heade
 
 ### Optional CLI wrapper config (`~/.apollo-claude/config`)
 
-Written by `bin/apollo-claude` on first run, or by `install_otel.sh`. Shared between the wrapper and `install_otel.sh`.
+Written by `bin/apollo-claude` on first run.
 
 | Variable | Required | Description |
 |---|---|---|
