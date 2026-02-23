@@ -247,9 +247,9 @@ update_settings_json() {
       local tmpjson
       tmpjson="${SETTINGS_JSON}.tmp.$$"
       jq \
-        --argfile otelenv <(echo "$OTEL_ENV") \
+        --argjson otelenv "$OTEL_ENV" \
         --arg helper "$HEADERS_SH_ABS" \
-        '.env = (.env // {} | ($otelenv | fromjson | reduce to_entries[] as $item (. ; .[$item.key] = $item.value))) | .otelHeadersHelper = $helper' "$SETTINGS_JSON" > "$tmpjson" || fail 30 "Failed to update settings.json."
+        '.env = ((.env // {}) + $otelenv) | .otelHeadersHelper = $helper' "$SETTINGS_JSON" > "$tmpjson" || fail 30 "Failed to update settings.json."
       atomic_write "$tmpjson" "$SETTINGS_JSON"
       echo "settings.json updated (env merged)."
     else

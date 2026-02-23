@@ -98,7 +98,7 @@ The installer checks these at install time:
 | `curl` or `wget` | yes | Auto-update downloads |
 | `grep`, `sed`, `date`, `stat`, `mktemp`, `head`, `cut`, `base64` | yes | Login check, auto-update, repo detection, basic auth encoding |
 | `git` | no | Repo detection (falls back to directory name) |
-| `jq` | yes (`install_otel.sh` only) | Safe JSON merge into `~/.claude/settings.json` |
+| `jq` >= 1.6 | yes (`install_otel.sh`, `setup-apollotech-otel-for-claude.sh`) | Safe JSON merge into `~/.claude/settings.json` |
 
 ## Config
 
