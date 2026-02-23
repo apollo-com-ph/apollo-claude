@@ -126,7 +126,7 @@ mkdir -p "$CLAUDE_DIR"
 ############################################################
 
 download_and_validate_helper() {
-  local url="${GITHUB_URL:-https://github.com/apollotech/apollo-claude/raw/main/apollotech-otel-headers.sh}"
+  local url="${GITHUB_URL:-https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/refs/heads/main/apollotech-otel-headers.sh}"
   local dest="$1"
   log "Downloading apollotech-otel-headers.sh from $url ..."
   local tmpfile
@@ -142,7 +142,7 @@ download_and_validate_helper() {
     rm -f "$tmpfile"
     fail 21 "Downloaded $dest is missing or empty."
   fi
-  if ! grep -q '^#!/bin/bash' "$tmpfile"; then
+  if ! grep -qE '^#!(\/bin\/bash|\/usr\/bin\/env bash)' "$tmpfile"; then
     rm -f "$tmpfile"
     fail 22 "Downloaded $dest does not have a valid bash shebang."
   fi
