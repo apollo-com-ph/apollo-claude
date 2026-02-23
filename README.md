@@ -5,13 +5,17 @@ OpenTelemetry telemetry for [Claude Code](https://docs.anthropic.com/en/docs/cla
 ## Quick install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh | bash
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh -o /tmp/setup-apollotech-otel-for-claude.sh \
+  && bash /tmp/setup-apollotech-otel-for-claude.sh \
+  && rm /tmp/setup-apollotech-otel-for-claude.sh
 ```
 
 Or with wget:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh | bash
+wget -qO /tmp/setup-apollotech-otel-for-claude.sh https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh \
+  && bash /tmp/setup-apollotech-otel-for-claude.sh \
+  && rm /tmp/setup-apollotech-otel-for-claude.sh
 ```
 
 The installer will:

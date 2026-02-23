@@ -254,6 +254,18 @@ prompt_for_config() {
 }
 
 if [ ! -f "$CONFIG" ]; then
+  if [ ! -t 0 ]; then
+    echo ""
+    echo "Error: credentials required but stdin is not a terminal (detected pipe or redirect)."
+    echo ""
+    echo "Download and run the script directly:"
+    echo ""
+    echo "  curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/setup-apollotech-otel-for-claude.sh -o /tmp/setup-apollotech-otel-for-claude.sh"
+    echo "  bash /tmp/setup-apollotech-otel-for-claude.sh"
+    echo "  rm /tmp/setup-apollotech-otel-for-claude.sh"
+    echo ""
+    exit 1
+  fi
   prompt_for_config
 else
   info "Config already present: $CONFIG"
