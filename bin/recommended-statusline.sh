@@ -1,42 +1,15 @@
 #!/bin/bash
-set -euo pipefail
-
-# Atomically write content to a file (via temp file)
-atomic_write_file() {
-    local target="$1"
-    local content="$2"
-    local tmp="${target}.tmp.$$"
-    echo "$content" > "$tmp"
-    if [ -s "$tmp" ]; then
-        if ! mv -f "$tmp" "$target" 2>/dev/null; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STATUSLINE] ERROR ❌ Failed to write file: $target" >> "$HOME/.claude/ccmetrics.log"
-            rm -f "$tmp"
-            return 1
-        fi
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STATUSLINE] ERROR ❌ Failed to generate file: $target" >> "$HOME/.claude/ccmetrics.log"
-        rm -f "$tmp"
-        return 1
-    fi
-    return 0
-}
-
 #############################################################################
 # Custom Claude Code Statusline - Session Metrics & API Utilization
 # Shows: [Model]%/$usd (remaining% reset label) parent/project
 #############################################################################
 
-# Cache directory for metrics (shared with SessionEnd hook)
-METRICS_CACHE_DIR="$HOME/.claude/metrics_cache"
-mkdir -p "$METRICS_CACHE_DIR"
+set -euo pipefail
 
-# Read session data from stdin
-INPUT=$(cat)
-
-# Logging support
-LOG_FILE="$HOME/.claude/ccmetrics.log"
+# Logging setup and functions
+LOG_FILE="$HOME/.claude/statusline.log"
 DEBUG_ENABLED=false
-CONFIG_FILE="$HOME/.claude/.ccmetrics-config.json"
+CONFIG_FILE="$HOME/.claude/.statusline-config.json"
 if [ -f "$CONFIG_FILE" ]; then
     DEBUG_ENABLED=$(jq -r '.debug // false' "$CONFIG_FILE" 2>/dev/null || echo "false")
 fi
@@ -48,6 +21,35 @@ debug_log() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STATUSLINE] DEBUG $1" >> "$LOG_FILE"
     fi
 }
+
+# Atomically write content to a file (via temp file)
+atomic_write_file() {
+    local target="$1"
+    local content="$2"
+    local tmp="${target}.tmp.$$"
+    echo "$content" > "$tmp"
+    if [ -s "$tmp" ]; then
+        if ! mv -f "$tmp" "$target" 2>/dev/null; then
+            log "ERROR ❌ Failed to write file: $target"
+            rm -f "$tmp"
+            return 1
+        fi
+    else
+        log "ERROR ❌ Failed to generate file: $target"
+        rm -f "$tmp"
+        return 1
+    fi
+    return 0
+}
+
+
+# Cache directory for metrics (shared with SessionEnd hook)
+METRICS_CACHE_DIR="$HOME/.claude/metrics_cache"
+mkdir -p "$METRICS_CACHE_DIR"
+
+# Read session data from stdin
+INPUT=$(cat)
+
 debug_log "raw stdin: $INPUT"
 
 # Cache session data for SessionEnd hook to read (high-watermark for used_percentage)
