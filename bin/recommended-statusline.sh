@@ -1,38 +1,53 @@
 #!/bin/bash
-#############################################################################
-# Custom Claude Code Statusline - Session Metrics & API Utilization
-# Shows: [Model]%/$usd (remaining% reset label) parent/project
-#############################################################################
-
 set -euo pipefail
 
-# Logging setup and functions
+# Claude Code Statusline Script
+# Displays session metrics and API utilization in the format:
+#   [Model]XX%/$YY.YY (remaining% reset) parent/project
+#
+# - Caches OAuth usage/profile data in $HOME/.claude/statusline_oauth_cache.json
+# to test: bash -n bin/recommended-statusline.sh && echo '{"model":{"display_name":"Claude-3"},"context_window":{"used_percentage":42},"cost":{"total_cost_usd":0.12},"workspace":{"project_dir":"/home/jessie/projects/apollo-claude"}}' | bash bin/recommended-statusline.sh
+
+## Logging setup
+# LOG_FILE: Path to log file
+# DEBUG_ENABLED: Enable debug logging with --debug
 LOG_FILE="$HOME/.claude/statusline.log"
 DEBUG_ENABLED=false
-CONFIG_FILE="$HOME/.claude/.statusline-config.json"
-if [ -f "$CONFIG_FILE" ]; then
-    DEBUG_ENABLED=$(jq -r '.debug // false' "$CONFIG_FILE" 2>/dev/null || echo "false")
+
+## Parse --debug switch
+if [ "${1:-}" = "--debug" ]; then
+    DEBUG_ENABLED=true
+    shift
 fi
+## Log a message to the log file
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STATUSLINE] $1" >> "$LOG_FILE"
 }
+## Log a debug message if debug is enabled
 debug_log() {
     if [ "$DEBUG_ENABLED" = "true" ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STATUSLINE] DEBUG $1" >> "$LOG_FILE"
     fi
 }
 
-# Atomically write content to a file (via temp file)
+## atomic_write_file(target, content)
+# Atomically writes content to a file. Logs errors if write fails.
+# Params:
+#   $1: Target file path
+#   $2: Content to write
 atomic_write_file() {
     local target="$1"
     local content="$2"
     local tmp="${target}.tmp.$$"
+    debug_log "atomic_write_file: Writing to $target (content length: ${#content})"
     echo "$content" > "$tmp"
     if [ -s "$tmp" ]; then
         if ! mv -f "$tmp" "$target" 2>/dev/null; then
             log "ERROR ❌ Failed to write file: $target"
             rm -f "$tmp"
             return 1
+        else
+            debug_log "atomic_write_file: Successfully wrote to $target"
         fi
     else
         log "ERROR ❌ Failed to generate file: $target"
@@ -43,51 +58,28 @@ atomic_write_file() {
 }
 
 
-# Cache directory for metrics (shared with SessionEnd hook)
-METRICS_CACHE_DIR="$HOME/.claude/metrics_cache"
-mkdir -p "$METRICS_CACHE_DIR"
+## Usage/profile cache file (shared for all sessions)
+USAGE_CACHE_FILE="$HOME/.claude/statusline_usage_cache.json"
 
-# Read session data from stdin
+## Read session data from stdin (expects JSON)
 INPUT=$(cat)
 
 debug_log "raw stdin: $INPUT"
 
-# Cache session data for SessionEnd hook to read (high-watermark for used_percentage)
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
-if [ -n "$SESSION_ID" ]; then
-    CACHE_FILE="${METRICS_CACHE_DIR}/${SESSION_ID}.json"
-    INCOMING_PCT=$(echo "$INPUT" | jq -r '.context_window.used_percentage // 0')
-    debug_log "session=$SESSION_ID incoming_pct=$INCOMING_PCT"
 
-    if [ -f "$CACHE_FILE" ]; then
-        OLD_PCT=$(jq -r '.context_window.used_percentage // 0' "$CACHE_FILE" 2>/dev/null || echo "0")
-        debug_log "old_pct=$OLD_PCT"
 
-        # Only apply high-watermark when incoming is zero; non-zero values always overwrite
-        if [ "$(awk "BEGIN {print ($INCOMING_PCT == 0) ? 1 : 0}")" -eq 1 ]; then
-            debug_log "HIGH-WATERMARK: incoming is 0, keeping old=$OLD_PCT"
-            atomic_write_file "$CACHE_FILE" "$(echo "$INPUT" | jq --argjson old_pct "$OLD_PCT" '.context_window.used_percentage = $old_pct')"
-        else
-            debug_log "writing incoming=$INCOMING_PCT (non-zero, overwriting old=$OLD_PCT)"
-            atomic_write_file "$CACHE_FILE" "$INPUT"
-        fi
-    else
-        debug_log "no existing cache, writing incoming=$INCOMING_PCT"
-        atomic_write_file "$CACHE_FILE" "$INPUT"
-    fi
-fi
-
-# ============================================================================
-# BACKGROUND OAUTH DATA CACHING (runs async, doesn't block statusline output)
-# ============================================================================
+###############################################################################
+# Background OAuth Data Caching (async)
+# Fetches usage/profile data from Anthropic API every 5 minutes and caches it.
+###############################################################################
 
 # Run OAuth fetch in background - does not block statusline output
 (
-    # Only fetch every 5 minutes
-    OAUTH_CACHE_FILE="${METRICS_CACHE_DIR}/_oauth_cache.json"
+
+    # Only fetch if more than 5 minutes since last fetch
     LAST_FETCH=0
-    if [ -f "$OAUTH_CACHE_FILE" ]; then
-        LAST_FETCH=$(jq -r '.fetched_at // 0' "$OAUTH_CACHE_FILE" 2>/dev/null || echo "0")
+    if [ -f "$USAGE_CACHE_FILE" ]; then
+        LAST_FETCH=$(jq -r '.fetched_at // 0' "$USAGE_CACHE_FILE" 2>/dev/null || echo "0")
     fi
 
     CURRENT_TIME=$(date +%s)
@@ -95,21 +87,22 @@ fi
 
     # Only fetch if > 5 minutes since last fetch
     if [ "$TIME_SINCE_FETCH" -lt 300 ]; then
+        debug_log "OAuth background fetch: skipping, only ${TIME_SINCE_FETCH}s since last fetch"
         exit 0
     fi
 
     debug_log "OAuth background fetch: starting (last_fetch=${TIME_SINCE_FETCH}s ago)"
 
-    # Check token expiry
+    # Check if OAuth token is expired
     CREDENTIALS_FILE="$HOME/.claude/.credentials.json"
     if [ ! -f "$CREDENTIALS_FILE" ]; then
-        debug_log "OAuth background fetch: no credentials file, skipping"
+        log "ERROR ❌ OAuth background fetch: no credentials file, skipping"
         exit 0
     fi
 
     EXPIRES_AT=$(jq -r '.claudeAiOauth.expiresAt // empty' "$CREDENTIALS_FILE" 2>/dev/null)
     if [ -z "$EXPIRES_AT" ]; then
-        debug_log "OAuth background fetch: no expiresAt in credentials, skipping"
+        log "ERROR ❌ OAuth background fetch: no expiresAt in credentials, skipping"
         exit 0
     fi
 
@@ -119,24 +112,29 @@ fi
         EXPIRES_EPOCH=$(date -d "$EXPIRES_AT" +%s 2>/dev/null || date -jf "%Y-%m-%dT%H:%M:%S" "${EXPIRES_AT%.*}" +%s 2>/dev/null || echo 0)
     fi
     if [ "$EXPIRES_EPOCH" -eq 0 ] || [ "$CURRENT_TIME" -ge "$EXPIRES_EPOCH" ]; then
-        debug_log "OAuth background fetch: token expired, skipping"
+        log "ERROR ❌ OAuth background fetch: token expired, skipping"
         exit 0
     fi
 
-    # Token is valid, fetch OAuth data
+    # Token is valid, fetch OAuth usage/profile data
     ACCESS_TOKEN=$(jq -r '.claudeAiOauth.accessToken // empty' "$CREDENTIALS_FILE" 2>/dev/null)
     if [ -z "$ACCESS_TOKEN" ]; then
-        debug_log "OAuth background fetch: no access token, skipping"
+        log "ERROR ❌ OAuth background fetch: no access token, skipping"
         exit 0
     fi
+    if [ "$USAGE_HTTP_CODE" != "200" ] || [ -z "$USAGE_RESPONSE" ]; then
+        log "ERROR ❌ USAGE API bad response: HTTP $USAGE_HTTP_CODE, response empty? $([ -z "$USAGE_RESPONSE" ] && echo yes || echo no)"
+    fi
 
-    # Fetch usage (2s timeout)
+    # Fetch usage data (2s timeout)
+    debug_log "USAGE API payload: URL=https://api.anthropic.com/api/oauth/usage Headers=Authorization: Bearer <redacted>, Content-Type: application/json, anthropic-beta: oauth-2025-04-20, Accept: application/json"
     USAGE_RAW=$(curl -s --max-time 2 -w "\n%{http_code}" \
         "https://api.anthropic.com/api/oauth/usage" \
         -H "Authorization: Bearer $ACCESS_TOKEN" \
         -H "Content-Type: application/json" \
         -H "anthropic-beta: oauth-2025-04-20" \
         -H "Accept: application/json" 2>/dev/null)
+    debug_log "USAGE API raw result: $USAGE_RAW"
     USAGE_HTTP_CODE=$(echo "$USAGE_RAW" | tail -1)
     USAGE_RESPONSE=$(echo "$USAGE_RAW" | sed '$d')
 
@@ -156,30 +154,15 @@ fi
         SEVEN_DAY_SONNET_RESETS=$(echo "$USAGE_RESPONSE" | jq -r '.seven_day_sonnet.resets_at // "null"')
     fi
 
-    # Fetch profile (2s timeout)
-    PROFILE_RAW=$(curl -s --max-time 2 -w "\n%{http_code}" \
-        "https://api.anthropic.com/api/oauth/profile" \
-        -H "Authorization: Bearer $ACCESS_TOKEN" \
-        -H "Content-Type: application/json" \
-        -H "anthropic-beta: oauth-2025-04-20" \
-        -H "Accept: application/json" 2>/dev/null)
-    PROFILE_HTTP_CODE=$(echo "$PROFILE_RAW" | tail -1)
-    PROFILE_RESPONSE=$(echo "$PROFILE_RAW" | sed '$d')
-
-    CLAUDE_ACCOUNT_EMAIL=""
-    if [ "$PROFILE_HTTP_CODE" = "200" ] && [ -n "$PROFILE_RESPONSE" ]; then
-        CLAUDE_ACCOUNT_EMAIL=$(echo "$PROFILE_RESPONSE" | jq -r '.account.email // ""')
-    fi
-
     # Log fetch results
-    if [ "$USAGE_HTTP_CODE" = "200" ] && [ "$PROFILE_HTTP_CODE" = "200" ]; then
-        debug_log "OAuth background fetch: success (7d=${SEVEN_DAY_UTIL}%, 5h=${FIVE_HOUR_UTIL}%, email=${CLAUDE_ACCOUNT_EMAIL:-empty})"
+    if [ "$USAGE_HTTP_CODE" = "200" ]; then
+        debug_log "OAuth background fetch: success (7d=${SEVEN_DAY_UTIL}%, 5h=${FIVE_HOUR_UTIL}%)"
     else
-        log "WARN  ⚠️  OAuth background fetch: usage HTTP $USAGE_HTTP_CODE, profile HTTP $PROFILE_HTTP_CODE"
+        log "WARN  ⚠️  OAuth background fetch: usage HTTP $USAGE_HTTP_CODE"
     fi
 
     # Write cache atomically
-    atomic_write_file "$OAUTH_CACHE_FILE" "$(jq -n \
+    atomic_write_file "$USAGE_CACHE_FILE" "$(jq -n \
         --argjson fetched_at "$CURRENT_TIME" \
         --argjson seven_day_util "$SEVEN_DAY_UTIL" \
         --arg seven_day_resets "$SEVEN_DAY_RESETS" \
@@ -187,7 +170,6 @@ fi
         --arg five_hour_resets "$FIVE_HOUR_RESETS" \
         --argjson seven_day_sonnet_util "$SEVEN_DAY_SONNET_UTIL" \
         --arg seven_day_sonnet_resets "$SEVEN_DAY_SONNET_RESETS" \
-        --arg claude_account "$CLAUDE_ACCOUNT_EMAIL" \
         '{
             fetched_at: $fetched_at,
             seven_day_utilization: $seven_day_util,
@@ -195,42 +177,42 @@ fi
             five_hour_utilization: $five_hour_util,
             five_hour_resets_at: (if $five_hour_resets == "null" then null else $five_hour_resets end),
             seven_day_sonnet_utilization: $seven_day_sonnet_util,
-            seven_day_sonnet_resets_at: (if $seven_day_sonnet_resets == "null" then null else $seven_day_sonnet_resets end),
-            claude_account_email: (if $claude_account == "" then null else $claude_account end)
+            seven_day_sonnet_resets_at: (if $seven_day_sonnet_resets == "null" then null else $seven_day_sonnet_resets end)
         }'
     )"
 ) &
 
-# Extract data using jq
+## Extract session metrics from input JSON
+# MODEL: Model name
+# USED_PCT: Context window usage percentage
+# COST_USD: Session/project cost in USD
+# PROJECT_DIR: Project directory
 MODEL=$(echo "$INPUT" | jq -r '.model.display_name // .model.id // "Unknown"')
 USED_PCT=$(echo "$INPUT" | jq -r '.context_window.used_percentage // 0')
 COST_USD=$(echo "$INPUT" | jq -r '.cost.total_cost_usd // 0')
 PROJECT_DIR=$(echo "$INPUT" | jq -r '.workspace.project_dir // ""')
+debug_log "Extracted metrics: MODEL=$MODEL USED_PCT=$USED_PCT COST_USD=$COST_USD PROJECT_DIR=$PROJECT_DIR"
 
-# Apply baseline delta for cost display after /clear
-if [ -n "$PROJECT_DIR" ]; then
-    _SL_PROJECT_HASH=$(echo -n "$PROJECT_DIR" | md5sum | cut -c1-8)
-    _SL_BASELINE_FILE="${METRICS_CACHE_DIR}/_clear_baseline_${_SL_PROJECT_HASH}.json"
-    if [ -f "$_SL_BASELINE_FILE" ]; then
-        _SL_BASELINE_COST=$(jq -r '.cost_usd // 0' "$_SL_BASELINE_FILE" 2>/dev/null || echo "0")
-        COST_USD=$(awk "BEGIN {v = $COST_USD - $_SL_BASELINE_COST; printf \"%.6f\", (v < 0 ? 0 : v)}")
-    fi
-fi
-
-# Format model name: 10 chars, right padded with spaces
+## format_model(model)
+# Formats model name to 10 characters, right-padded.
+# Params: $1: Model name
 format_model() {
     local model="$1"
     printf "%-10.10s" "$model"
 }
 
-# Format percentage: 2 chars + "%", left padded with 0, whole numbers
+## format_percentage(pct)
+# Formats percentage as 2 digits plus "%".
+# Params: $1: Percentage value
 format_percentage() {
     local pct="$1"
     local rounded=$(awk "BEGIN {printf \"%.0f\", $pct + 0.5}")
     printf "%02d%%" "$rounded"
 }
 
-# Format cost: 4 chars, $0.0 to $999, right padded
+## format_cost(cost)
+# Formats cost as $0.0-$999.
+# Params: $1: Cost value
 format_cost() {
     local cost="$1"
 
@@ -263,17 +245,19 @@ format_cost() {
     printf "\$%3.0f" "$cost"
 }
 
-# Format project directory: last 2 path components
+## format_project_dir(path)
+# Formats project directory as last two path components.
+# Params: $1: Full project path
 format_project_dir() {
     local path="$1"
 
-    # Default if missing
+    # Return empty if missing
     if [ -z "$path" ]; then
         echo ""
         return
     fi
 
-    # Extract last 2 path components
+    # Extract last two path components
     local parent=$(basename "$(dirname "$path")")
     local leaf=$(basename "$path")
     if [ "$parent" = "/" ] || [ "$parent" = "." ]; then
@@ -285,7 +269,9 @@ format_project_dir() {
     echo "$path"
 }
 
-# Format reset time: ISO timestamp → "XhXXm" or "XdXXh"
+## format_reset_time(resets_at)
+# Formats reset time from ISO to "XhXXm" or "XdXXh". Returns placeholder if invalid.
+# Params: $1: ISO timestamp
 format_reset_time() {
     local resets_at="$1"
 
@@ -294,7 +280,7 @@ format_reset_time() {
         return
     fi
 
-    # Parse ISO timestamp to epoch
+    # Parse ISO timestamp to epoch seconds
     local reset_epoch
     reset_epoch=$(date -d "$resets_at" +%s 2>/dev/null || date -jf "%Y-%m-%dT%H:%M:%S" "${resets_at%.*}" +%s 2>/dev/null || echo 0)
     if [ "$reset_epoch" -eq 0 ]; then
@@ -325,23 +311,22 @@ format_reset_time() {
     fi
 }
 
-# Read OAuth cache and format utilization display
-# Logic: Always show 5h limits, conditionally show 7d warning if exceeding sustainable rate
+## format_utilization()
+# Reads OAuth cache and formats utilization display.
+# Always shows 5h limits; shows 7d warning if exceeding sustainable rate.
 format_utilization() {
-    local session_id="$1"
-    local oauth_cache="${METRICS_CACHE_DIR}/_oauth_cache.json"
 
     # No OAuth data available
-    if [ ! -f "$oauth_cache" ]; then
+    if [ ! -f "$USAGE_CACHE_FILE" ]; then
         echo "(-- -----)"
         return
     fi
 
     local five_hour_util seven_day_util five_hour_resets seven_day_resets
-    five_hour_util=$(jq -r '.five_hour_utilization // "null"' "$oauth_cache" 2>/dev/null)
-    seven_day_util=$(jq -r '.seven_day_utilization // "null"' "$oauth_cache" 2>/dev/null)
-    five_hour_resets=$(jq -r '.five_hour_resets_at // "null"' "$oauth_cache" 2>/dev/null)
-    seven_day_resets=$(jq -r '.seven_day_resets_at // "null"' "$oauth_cache" 2>/dev/null)
+    five_hour_util=$(jq -r '.five_hour_utilization // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
+    seven_day_util=$(jq -r '.seven_day_utilization // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
+    five_hour_resets=$(jq -r '.five_hour_resets_at // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
+    seven_day_resets=$(jq -r '.seven_day_resets_at // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
 
     local have_5h=false have_7d=false
     if [ "$five_hour_util" != "null" ] && [ -n "$five_hour_util" ]; then
@@ -351,13 +336,13 @@ format_utilization() {
         have_7d=true
     fi
 
-    # Neither available
+    # Neither utilization available
     if [ "$have_5h" = "false" ] && [ "$have_7d" = "false" ]; then
         echo "(-- -----)"
         return
     fi
 
-    # 5h is required - if missing, show placeholder
+    # 5h utilization is required; if missing, show placeholder
     if [ "$have_5h" = "false" ]; then
         echo "(-- -----)"
         return
@@ -367,12 +352,12 @@ format_utilization() {
     local five_hour_remaining
     five_hour_remaining=$(awk "BEGIN {printf \"%.0f\", 100 - $five_hour_util}")
 
-    # Always format 5h as primary display (no label needed since it's always 5h)
+    # Always format 5h as primary display
     local five_hour_fmt reset_fmt
     reset_fmt=$(format_reset_time "$five_hour_resets")
     five_hour_fmt=$(printf "(%2d%% %5s)" "$five_hour_remaining" "$reset_fmt")
 
-    # Check if 7d warning should be shown
+    # Show 7d warning if utilization exceeds sustainable threshold
     local seven_day_warning=""
 
     if [ "$have_7d" = "true" ]; then
@@ -387,7 +372,7 @@ format_utilization() {
             seconds_remaining=0
         fi
 
-        # Convert to days (with fractional precision)
+        # Convert to days (fractional)
         days_remaining=$(awk "BEGIN {printf \"%.2f\", $seconds_remaining / 86400}")
         days_elapsed=$(awk "BEGIN {printf \"%.2f\", 7 - $days_remaining}")
 
@@ -414,15 +399,12 @@ format_utilization() {
 MODEL_FMT=$(format_model "$MODEL")
 PCT_FMT=$(format_percentage "$USED_PCT")
 COST_FMT=$(format_cost "$COST_USD")
-UTIL_FMT=$(format_utilization "$SESSION_ID")
+UTIL_FMT=$(format_utilization)
 PROJECT_FMT=$(format_project_dir "$PROJECT_DIR")
+debug_log "Formatted metrics: MODEL_FMT=$MODEL_FMT PCT_FMT=$PCT_FMT COST_FMT=$COST_FMT UTIL_FMT=$UTIL_FMT PROJECT_FMT=$PROJECT_FMT"
 
-# Output statusline: [Model]%/$usd (remaining% reset label) parent/project
+## Output statusline: [Model]%/$usd (remaining% reset) parent/project
 STATUSLINE_OUTPUT="[${MODEL_FMT}]${PCT_FMT}/${COST_FMT} ${UTIL_FMT} ${PROJECT_FMT}"
-
-# Write to file for external consumers (VS Code status bar extension, etc.)
-STATUSLINE_FILE="${METRICS_CACHE_DIR}/_statusline.txt"
-atomic_write_file "$STATUSLINE_FILE" "$STATUSLINE_OUTPUT"
 
 # Output to stdout (displayed in CLI mode)
 echo "$STATUSLINE_OUTPUT"
