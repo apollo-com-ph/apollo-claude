@@ -122,9 +122,6 @@ debug_log "raw stdin: $INPUT"
         log "ERROR ❌ OAuth background fetch: no access token, skipping"
         exit 0
     fi
-    if [ "$USAGE_HTTP_CODE" != "200" ] || [ -z "$USAGE_RESPONSE" ]; then
-        log "ERROR ❌ USAGE API bad response: HTTP $USAGE_HTTP_CODE, response empty? $([ -z "$USAGE_RESPONSE" ] && echo yes || echo no)"
-    fi
 
     # Fetch usage data (2s timeout)
     debug_log "USAGE API payload: URL=https://api.anthropic.com/api/oauth/usage Headers=Authorization: Bearer <redacted>, Content-Type: application/json, anthropic-beta: oauth-2025-04-20, Accept: application/json"
@@ -137,6 +134,9 @@ debug_log "raw stdin: $INPUT"
     debug_log "USAGE API raw result: $USAGE_RAW"
     USAGE_HTTP_CODE=$(echo "$USAGE_RAW" | tail -1)
     USAGE_RESPONSE=$(echo "$USAGE_RAW" | sed '$d')
+    if [ "$USAGE_HTTP_CODE" != "200" ] || [ -z "$USAGE_RESPONSE" ]; then
+        log "ERROR ❌ USAGE API bad response: HTTP $USAGE_HTTP_CODE, response empty? $([ -z "$USAGE_RESPONSE" ] && echo yes || echo no)"
+    fi
 
     SEVEN_DAY_UTIL="null"
     SEVEN_DAY_RESETS="null"
