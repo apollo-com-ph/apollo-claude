@@ -66,6 +66,11 @@ INPUT=$(cat)
 
 debug_log "raw stdin: $INPUT"
 
+if ! echo "$INPUT" | jq -e . > /dev/null 2>&1; then
+    echo "[Unknown   ]00%/\$0.0 (-- -----) "
+    exit 0
+fi
+
 
 
 ###############################################################################
@@ -146,12 +151,16 @@ debug_log "raw stdin: $INPUT"
     SEVEN_DAY_SONNET_RESETS="null"
 
     if [ "$USAGE_HTTP_CODE" = "200" ] && [ -n "$USAGE_RESPONSE" ]; then
-        SEVEN_DAY_UTIL=$(echo "$USAGE_RESPONSE" | jq -r '.seven_day.utilization // "null"')
-        SEVEN_DAY_RESETS=$(echo "$USAGE_RESPONSE" | jq -r '.seven_day.resets_at // "null"')
-        FIVE_HOUR_UTIL=$(echo "$USAGE_RESPONSE" | jq -r '.five_hour.utilization // "null"')
-        FIVE_HOUR_RESETS=$(echo "$USAGE_RESPONSE" | jq -r '.five_hour.resets_at // "null"')
-        SEVEN_DAY_SONNET_UTIL=$(echo "$USAGE_RESPONSE" | jq -r '.seven_day_sonnet.utilization // "null"')
-        SEVEN_DAY_SONNET_RESETS=$(echo "$USAGE_RESPONSE" | jq -r '.seven_day_sonnet.resets_at // "null"')
+        { read -r SEVEN_DAY_UTIL; read -r SEVEN_DAY_RESETS; read -r FIVE_HOUR_UTIL; read -r FIVE_HOUR_RESETS; read -r SEVEN_DAY_SONNET_UTIL; read -r SEVEN_DAY_SONNET_RESETS; } < <(
+            echo "$USAGE_RESPONSE" | jq -r '
+                (.seven_day.utilization // "null"),
+                (.seven_day.resets_at // "null"),
+                (.five_hour.utilization // "null"),
+                (.five_hour.resets_at // "null"),
+                (.seven_day_sonnet.utilization // "null"),
+                (.seven_day_sonnet.resets_at // "null")
+            '
+        )
     fi
 
     # Log fetch results
@@ -187,10 +196,14 @@ debug_log "raw stdin: $INPUT"
 # USED_PCT: Context window usage percentage
 # COST_USD: Session/project cost in USD
 # PROJECT_DIR: Project directory
-MODEL=$(echo "$INPUT" | jq -r '.model.display_name // .model.id // "Unknown"')
-USED_PCT=$(echo "$INPUT" | jq -r '.context_window.used_percentage // 0')
-COST_USD=$(echo "$INPUT" | jq -r '.cost.total_cost_usd // 0')
-PROJECT_DIR=$(echo "$INPUT" | jq -r '.workspace.project_dir // ""')
+{ read -r MODEL; read -r USED_PCT; read -r COST_USD; read -r PROJECT_DIR; } < <(
+    echo "$INPUT" | jq -r '
+        (.model.display_name // .model.id // "Unknown"),
+        (.context_window.used_percentage // 0),
+        (.cost.total_cost_usd // 0),
+        (.workspace.project_dir // "")
+    '
+)
 debug_log "Extracted metrics: MODEL=$MODEL USED_PCT=$USED_PCT COST_USD=$COST_USD PROJECT_DIR=$PROJECT_DIR"
 
 ## format_model(model)
@@ -206,7 +219,7 @@ format_model() {
 # Params: $1: Percentage value
 format_percentage() {
     local pct="$1"
-    local rounded=$(awk "BEGIN {printf \"%.0f\", $pct + 0.5}")
+    local rounded=$(awk "BEGIN {printf \"%.0f\", $pct}")
     printf "%02d%%" "$rounded"
 }
 
@@ -225,7 +238,11 @@ format_cost() {
     # $0.1-$0.9: "$0.X" (1 decimal)
     if [ "$(awk "BEGIN {print ($cost < 1.0) ? 1 : 0}")" -eq 1 ]; then
         local tenths=$(awk "BEGIN {printf \"%.0f\", $cost * 10}")
-        printf "\$0.%s" "$tenths"
+        if [ "$tenths" -ge 10 ]; then
+            printf "\$1.0"
+        else
+            printf "\$0.%s" "$tenths"
+        fi
         return
     fi
 
@@ -323,10 +340,14 @@ format_utilization() {
     fi
 
     local five_hour_util seven_day_util five_hour_resets seven_day_resets
-    five_hour_util=$(jq -r '.five_hour_utilization // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
-    seven_day_util=$(jq -r '.seven_day_utilization // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
-    five_hour_resets=$(jq -r '.five_hour_resets_at // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
-    seven_day_resets=$(jq -r '.seven_day_resets_at // "null"' "$USAGE_CACHE_FILE" 2>/dev/null)
+    local _cache_data
+    _cache_data=$(jq -r '
+        (.five_hour_utilization // "null"),
+        (.seven_day_utilization // "null"),
+        (.five_hour_resets_at // "null"),
+        (.seven_day_resets_at // "null")
+    ' "$USAGE_CACHE_FILE" 2>/dev/null) || _cache_data=$'null\nnull\nnull\nnull'
+    { read -r five_hour_util; read -r seven_day_util; read -r five_hour_resets; read -r seven_day_resets; } <<< "$_cache_data"
 
     local have_5h=false have_7d=false
     if [ "$five_hour_util" != "null" ] && [ -n "$five_hour_util" ]; then
@@ -350,7 +371,7 @@ format_utilization() {
 
     # Calculate remaining percentage for 5h (100 - utilization)
     local five_hour_remaining
-    five_hour_remaining=$(awk "BEGIN {printf \"%.0f\", 100 - $five_hour_util}")
+    five_hour_remaining=$(awk "BEGIN {r = 100 - $five_hour_util; printf \"%.0f\", (r < 0 ? 0 : r)}")
 
     # Always format 5h as primary display
     local five_hour_fmt reset_fmt
@@ -386,7 +407,7 @@ format_utilization() {
 
         if [ "$exceeds_threshold" -eq 1 ]; then
             local seven_day_remaining seven_reset_fmt
-            seven_day_remaining=$(awk "BEGIN {printf \"%.0f\", 100 - $seven_day_util}")
+            seven_day_remaining=$(awk "BEGIN {r = 100 - $seven_day_util; printf \"%.0f\", (r < 0 ? 0 : r)}")
             seven_reset_fmt=$(format_reset_time "$seven_day_resets")
             seven_day_warning=$(printf " !%d%% %s!" "$seven_day_remaining" "$seven_reset_fmt")
         fi
