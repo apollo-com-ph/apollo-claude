@@ -56,6 +56,10 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Loki, G
 - `SETUP.md` — OTel collector deployment guide.
 - `bin/apollo-claude` — optional CLI wrapper (bash). Installed to `~/.local/bin/apollo-claude` by `install-apollo-claude-wrapper.sh`. Provides auth isolation and auto-update; most developers don't need this.
 - `install-apollo-claude-wrapper.sh` — one-liner installer for the optional CLI wrapper. Uses POSIX `sh` for portability.
+- `install-statusline.sh` — installer for the Claude Code statusline. Downloads `bin/recommended-statusline.sh` to `~/.claude/hooks/statusline.sh` and merges the `statusLine` hook config into `~/.claude/settings.json`. Requires `bash`, `curl`, `jq`, and common POSIX utilities.
+- `bin/recommended-statusline.sh` — Claude Code statusline script. Reads session metrics from stdin (JSON), fetches OAuth usage/plan utilization from the Anthropic API in the background every 5 minutes (cached in `~/.claude/statusline_usage_cache.json`), and outputs `[Model]XX%/$Y.YY (remaining% reset) parent/project`.
+- `recommended-settings.json` — example `~/.claude/settings.json` with suggested permission defaults (allow/deny list) and model setting. Not installed automatically; developers copy or reference it manually.
+- `bin/release` — release automation script. Bumps `VERSION` and `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`, syntax-checks the wrapper, then commits and pushes.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 
 ## Development
@@ -67,6 +71,8 @@ There is no build step, test suite, or linter. The project is shell scripts.
 bash -n setup-apollotech-otel-for-claude.sh
 bash -n apollotech-otel-headers.sh
 bash -n bin/apollo-claude
+bash -n install-statusline.sh
+bash -n bin/recommended-statusline.sh
 sh -n install-apollo-claude-wrapper.sh
 bash -n install_collector.sh
 ```
@@ -88,7 +94,7 @@ OTEL_LOGS_EXPORTER=console claude --version
 
 ## Conventions
 
-- `setup-apollotech-otel-for-claude.sh`, `apollotech-otel-headers.sh`, and `bin/apollo-claude` use `set -euo pipefail` and bash. `install-apollo-claude-wrapper.sh` uses `set -eu` and POSIX sh.
+- `setup-apollotech-otel-for-claude.sh`, `apollotech-otel-headers.sh`, `bin/apollo-claude`, `install-statusline.sh`, and `bin/recommended-statusline.sh` use `set -euo pipefail` and bash. `install-apollo-claude-wrapper.sh` uses `set -eu` and POSIX sh.
 - Config is read via line-by-line `IFS='=' read`, not `source`, to avoid executing arbitrary code. Only `APOLLO_*` keys are processed; other keys are silently ignored. Leading/trailing whitespace on keys and values is trimmed.
 - `settings.json` is always updated via a `jq` merge into a temp file followed by atomic `mv` — never written directly, and always backed up first.
 - Downloaded helpers (e.g. `apollotech-otel-headers.sh`) are validated before install: non-empty, bash shebang present, `bash -n` syntax check passes.
@@ -109,6 +115,16 @@ OTEL_LOGS_EXPORTER=console claude --version
 | `curl` or `wget` | yes | Downloading `apollotech-otel-headers.sh`; credential validation |
 | `grep`, `tr`, `sed`, `basename`, `date`, `chmod`, `cp`, `mkdir`, `mv` | yes | Validation, config handling, atomic writes |
 | `git` | no | Repo detection in the headers helper (falls back to directory name) |
+
+### `install-statusline.sh` (statusline installer)
+
+| Dependency | Required | Used for |
+|---|---|---|
+| `bash` | yes | Script runs under bash |
+| `claude` | yes | Confirms Claude Code is installed before proceeding |
+| `curl` | yes | Downloading `bin/recommended-statusline.sh`; required by the statusline at runtime |
+| `jq` >= 1.6 | yes | Merging `statusLine` hook config into `~/.claude/settings.json` |
+| `awk`, `date`, `basename`, `dirname`, `sed`, `tail` | yes | Runtime dependencies of the installed statusline script |
 
 ### `bin/apollo-claude` (optional CLI wrapper)
 
