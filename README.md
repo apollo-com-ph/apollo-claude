@@ -162,8 +162,26 @@ Claude Code permissions use prefix matching, which means compound commands like 
 | Layer | Mechanism | What it catches |
 |---|---|---|
 | 1. Allow list | `Bash(*)` | Fast pass-through for all Bash commands (low friction) |
-| 2. Deny list | `Bash(rm -rf *)`, etc. | Prefix-matches obvious destructive commands |
-| 3. PreToolUse hook | `safe-bash-hook` binary | Compound commands (`&&`, `\|\|`, `;`, pipes), embedded shell (`bash -c "…"`), and any pattern in the deny list that bypasses prefix matching |
+| 2. Deny list | `Bash(rm -rf *)`, `Bash(sudo *)`, etc. | Prefix-matches destructive commands and privilege escalation |
+| 3. PreToolUse hook | `safe-bash-hook` binary | Compound commands, credential reads, exfiltration vectors, privilege escalation, persistence, container escape |
+
+**Always blocked (hardcoded in the binary — cannot be overridden):**
+
+- **Destructive file ops** — `rm -rf`, `rm -r`, `mkfs`, `dd`, `shred`
+- **Destructive git** — force push, `reset --hard`, `checkout --`
+- **Privilege escalation** — `sudo`, `su`, `pkexec`, `doas`, SUID/SGID bit setting
+- **Core credential reads** — SSH keys, AWS/GCP/Azure credentials, `.env` files, `/etc/shadow`, Claude credentials
+- **Exfiltration** — pipe to curl/shell, `curl --data @file`, `curl -T`
+- **Shell injection** — `eval`, `bash -c` with destructive payloads, pipe to shell interpreters
+- **Persistence** — `crontab`, `at`/`batch`, `systemctl enable/start`
+- **Container escape** — `docker run --privileged`, host root mounts, Docker socket mounts
+- **System** — fork bombs, `shutdown`, `reboot`, `kill -9 -1`
+
+**Blocked by default, overridable via `allow` rules in `safe-bash-patterns.json`:**
+
+- **Destructive git ops** — `git clean`, `git restore`, `git branch -D`, `gh api DELETE/PUT/POST`, `rmdir`
+- **Network transfer tools** — `netcat`, `scp`, `sftp`, `ftp`, `socat`, `telnet`
+- **Additional credential reads** — GPG keys, GitHub CLI tokens, `.git-credentials`, `.netrc`
 
 ### Install
 
@@ -195,7 +213,7 @@ The hook loads additional patterns from `~/.claude/hooks/safe-bash-patterns.json
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "deny": [
     {"pattern": "\\bdeploy\\.sh\\b", "reason": "Run deploy.sh manually — don't let Claude deploy"}
   ],
