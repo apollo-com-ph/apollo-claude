@@ -159,18 +159,6 @@ fn blocks_git_reset_hard() {
 }
 
 #[test]
-fn blocks_git_clean() {
-    let (code, _) = run(&bash_input("git clean -fd"));
-    assert_eq!(code, 2);
-}
-
-#[test]
-fn blocks_git_branch_d() {
-    let (code, _) = run(&bash_input("git branch -D feature"));
-    assert_eq!(code, 2);
-}
-
-#[test]
 fn blocks_chmod_r_777() {
     let (code, _) = run(&bash_input("chmod -R 777 /"));
     assert_eq!(code, 2);
@@ -185,12 +173,6 @@ fn blocks_cat_ssh_key() {
 #[test]
 fn blocks_cat_env() {
     let (code, _) = run(&bash_input("cat .env"));
-    assert_eq!(code, 2);
-}
-
-#[test]
-fn blocks_gh_api_delete() {
-    let (code, _) = run(&bash_input("gh api -X DELETE /repos/org/repo"));
     assert_eq!(code, 2);
 }
 

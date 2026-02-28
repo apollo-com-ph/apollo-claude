@@ -1,10 +1,56 @@
 {
-  "version": 1,
+  "version": 2,
   "deny": [
     {"pattern": "\\brm\\s+-(rf|fr)\\b", "reason": "Destructive: rm -rf"},
     {"pattern": "\\bgit\\s+push\\s+(-f|--force)\\b", "reason": "Destructive: git force push"},
     {"pattern": "\\bwget\\b.*-O\\s*-.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: wget pipe to shell"},
-    {"pattern": "\\bcurl\\b.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: curl pipe to shell"}
+    {"pattern": "\\bcurl\\b.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: curl pipe to shell"},
+
+    {"pattern": "(?i)\\bchown\\s+.*\\s+/(etc|usr|bin|sbin|lib|var|boot|root|sys|proc|dev)\\b", "reason": "Privilege escalation: chown on system path"},
+
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?npmrc", "reason": "Sensitive: reading .npmrc (may contain auth tokens)"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?pypirc", "reason": "Sensitive: reading .pypirc (PyPI auth tokens)"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?docker/config\\.json", "reason": "Sensitive: reading Docker config (registry credentials)"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?kube/config", "reason": "Sensitive: reading kubeconfig (cluster credentials)"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?config/gcloud/", "reason": "Sensitive: reading Google Cloud credentials"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?azure/", "reason": "Sensitive: reading Azure credentials"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?config/op/", "reason": "Sensitive: reading 1Password CLI config"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?password-store/", "reason": "Sensitive: reading password-store"},
+
+    {"pattern": "(?i)\\bcurl\\b.*(-F\\s|--form\\s)", "reason": "Exfiltration: curl form file upload"},
+    {"pattern": "(?i)\\bwget\\s+.*(--post-file|--post-data|--body-file)\\s", "reason": "Exfiltration: wget POST/upload"},
+    {"pattern": "(?i)\\brsync\\s+.*\\s\\S+:\\S", "reason": "Exfiltration: rsync to remote host"},
+    {"pattern": "(?i)\\bopenssl\\s+s_client\\b", "reason": "Exfiltration: openssl s_client"},
+    {"pattern": "(?i)\\bdocker\\s+run\\s+.*(-v|--volume)\\s+/var/run/docker\\.sock:", "reason": "Container escape: docker socket mount"},
+    {"pattern": "(?i)\\bdocker\\s+run\\s+.*(-v|--volume)\\s+/:/", "reason": "Container escape: mounting host root filesystem"},
+
+    {"pattern": "(?i)\\bpython3?\\s+-c\\s+[\"']?[^\"']*\\b(urllib|requests|http\\.client|socket)\\b", "reason": "Scripted exfil: python -c with network library"},
+    {"pattern": "(?i)\\bnode\\s+(-e|--eval)\\s+[\"']?[^\"']*\\b(https?|fetch|axios|got)\\b", "reason": "Scripted exfil: node -e with network module"},
+    {"pattern": "(?i)\\bruby\\s+-e\\s+[\"']?[^\"']*\\b(net\\/http|open-uri|httparty)\\b", "reason": "Scripted exfil: ruby -e with network library"},
+    {"pattern": "(?i)\\bperl\\s+-e\\s+[\"']?[^\"']*\\b(LWP|HTTP|IO::Socket)\\b", "reason": "Scripted exfil: perl -e with network module"},
+
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*at\\s+(now|midnight|noon|\\d)", "reason": "Persistence: at command (scheduled execution)"},
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*batch\\b", "reason": "Persistence: batch command"},
+    {"pattern": "(?i)\\bsystemctl\\s+(enable|start|restart|mask|unmask)\\b", "reason": "Persistence: systemctl service management"},
+    {"pattern": "(?i)\\blaunchctl\\s+(load|bootstrap|enable|submit)\\b", "reason": "Persistence: launchctl service management (macOS)"},
+
+    {"pattern": "(?i)\\brmdir\\b", "reason": "Destructive: rmdir"},
+    {"pattern": "(?i)\\bgit\\s+clean\\b", "reason": "Destructive: git clean"},
+    {"pattern": "(?i)\\bgit\\s+restore\\b", "reason": "Destructive: git restore"},
+    {"pattern": "(?i)\\bgit\\s+branch\\s+(-D|--delete\\s+-f)\\b", "reason": "Destructive: git branch -D"},
+    {"pattern": "(?i)\\b(nc|netcat)\\s+", "reason": "Exfiltration: netcat"},
+    {"pattern": "(?i)\\bgh\\s+api\\s+.*-X\\s+DELETE\\b", "reason": "Destructive: gh api DELETE"},
+    {"pattern": "(?i)\\bgh\\s+api\\s+.*-X\\s+PUT\\b", "reason": "Destructive: gh api PUT"},
+    {"pattern": "(?i)\\bgh\\s+api\\s+.*-X\\s+POST\\b", "reason": "Destructive: gh api POST"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?gnupg/", "reason": "Sensitive: reading GPG private key"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?config/gh/", "reason": "Sensitive: reading GitHub CLI tokens"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?git-credentials", "reason": "Sensitive: reading git-credentials"},
+    {"pattern": "(?i)\\b(cat|head|tail|less|more|bat)\\s+.*~?/?\\.?netrc", "reason": "Sensitive: reading .netrc credentials"},
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*scp\\s+", "reason": "Exfiltration: scp remote copy"},
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*sftp\\b", "reason": "Exfiltration: sftp file transfer"},
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*ftp\\b", "reason": "Exfiltration: ftp file transfer"},
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*socat\\b", "reason": "Exfiltration: socat network relay"},
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*telnet\\b", "reason": "Exfiltration: telnet connection"}
   ],
   "allow": [
     {"pattern": "^git log\\b", "reason": "Safe: read-only git log"},
