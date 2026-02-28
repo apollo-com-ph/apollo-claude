@@ -237,7 +237,15 @@ DENY_LIST='[
   "Bash(gh api -X POST *)",
   "Bash(chmod -R 777 *)",
   "Bash(> *)",
-  "Bash(sed -i *)"
+  "Bash(sed -i *)",
+  "Bash(sudo *)",
+  "Bash(su *)",
+  "Bash(su -*)",
+  "Bash(pkexec *)",
+  "Bash(doas *)",
+  "Bash(scp *)",
+  "Bash(crontab *)",
+  "Bash(docker run --privileged *)"
 ]'
 
 if [ -f "$SETTINGS_JSON" ]; then
