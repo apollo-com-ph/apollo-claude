@@ -27,6 +27,11 @@ if ! bash -n "${WRAPPER}"; then
     exit 1
 fi
 
+if ! bash -n "${REPO_ROOT}/install-safe-bash-hook.sh"; then
+    echo "error: install-safe-bash-hook.sh failed syntax check" >&2
+    exit 1
+fi
+
 git -C "${REPO_ROOT}" add "${VERSION_FILE}" "${WRAPPER}"
 git -C "${REPO_ROOT}" commit -m "Release v${next}"
 git -C "${REPO_ROOT}" push

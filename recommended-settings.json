@@ -23,5 +23,18 @@
       "Bash(sed -i *)"
     ]
   },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/safe-bash-hook"
+          }
+        ]
+      }
+    ]
+  },
   "model": "opusplan"
 }

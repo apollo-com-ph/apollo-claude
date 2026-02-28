@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "deny": [
+    {"pattern": "\\brm\\s+-(rf|fr)\\b", "reason": "Destructive: rm -rf"},
+    {"pattern": "\\bgit\\s+push\\s+(-f|--force)\\b", "reason": "Destructive: git force push"},
+    {"pattern": "\\bwget\\b.*-O\\s*-.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: wget pipe to shell"},
+    {"pattern": "\\bcurl\\b.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: curl pipe to shell"}
+  ],
+  "allow": [
+    {"pattern": "^git log\\b", "reason": "Safe: read-only git log"},
+    {"pattern": "^git show\\b", "reason": "Safe: read-only git show"},
+    {"pattern": "^git diff\\b", "reason": "Safe: read-only git diff"}
+  ]
+}

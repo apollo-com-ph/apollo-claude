@@ -58,13 +58,16 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Loki, G
 - `install-apollo-claude-wrapper.sh` — one-liner installer for the optional CLI wrapper. Uses POSIX `sh` for portability.
 - `install-statusline.sh` — installer for the Claude Code statusline. Downloads `bin/recommended-statusline.sh` to `~/.claude/hooks/statusline.sh` and merges the `statusLine` hook config into `~/.claude/settings.json`. Requires `bash`, `curl`, `jq`, and common POSIX utilities.
 - `bin/recommended-statusline.sh` — Claude Code statusline script. Reads session metrics from stdin (JSON), fetches OAuth usage/plan utilization from the Anthropic API in the background every 5 minutes (cached in `~/.claude/statusline_usage_cache.json`), and outputs `[Model]XX%/$Y.YY (remaining% reset) parent/project`.
-- `recommended-settings.json` — example `~/.claude/settings.json` with suggested permission defaults (allow/deny list) and model setting. Not installed automatically; developers copy or reference it manually.
-- `bin/release` — release automation script. Bumps `VERSION` and `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`, syntax-checks the wrapper, then commits and pushes.
+- `recommended-settings.json` — example `~/.claude/settings.json` with suggested permission defaults (allow/deny list, PreToolUse hook, model). Not installed automatically; developers copy or reference it manually.
+- `safe-bash-patterns.json` — remote patterns file for `safe-bash-hook`. Contains additional deny/allow regex patterns that extend the hardcoded set. Fetched hourly in the background by the hook; served via `raw.githubusercontent.com`.
+- `install-safe-bash-hook.sh` — installer for the safe-bash-hook PreToolUse binary. Downloads the platform-specific binary from GitHub Releases, validates it, installs to `~/.claude/hooks/safe-bash-hook`, downloads initial patterns, and merges the PreToolUse hook config + deny list into `~/.claude/settings.json`.
+- `hooks/safe-bash/` — Rust source for the `safe-bash-hook` binary. Reads PreToolUse JSON from stdin, checks the command against hardcoded + config patterns, exits 0 (allow) or 2 (block). Cross-compiled for Linux amd64/arm64 and macOS Intel/Apple Silicon. See `hooks/safe-bash/build.sh` for release builds.
+- `bin/release` — release automation script. Bumps `VERSION` and `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`, syntax-checks the wrapper and `install-safe-bash-hook.sh`, then commits and pushes.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 
 ## Development
 
-There is no build step, test suite, or linter. The project is shell scripts.
+The project is primarily shell scripts with one Rust binary (`hooks/safe-bash/`).
 
 **Syntax-check all scripts:**
 ```sh
@@ -72,10 +75,28 @@ bash -n setup-apollotech-otel-for-claude.sh
 bash -n apollotech-otel-headers.sh
 bash -n bin/apollo-claude
 bash -n install-statusline.sh
+bash -n install-safe-bash-hook.sh
 bash -n bin/recommended-statusline.sh
 sh -n install-apollo-claude-wrapper.sh
 bash -n install_collector.sh
 ```
+
+**Build the safe-bash-hook binary (requires Rust):**
+```sh
+# Build for current platform (development/testing)
+cd hooks/safe-bash && cargo build --release
+
+# Run unit tests
+cd hooks/safe-bash && cargo test
+
+# Run shell integration tests against the compiled binary
+cd hooks/safe-bash && ./test.sh
+
+# Cross-compile all release targets (requires cargo-zigbuild or cross)
+cd hooks/safe-bash && ./build.sh
+```
+
+`cargo` is a **build-time dependency only** — end users download the pre-compiled binary via `install-safe-bash-hook.sh` and do not need Rust installed.
 
 **Run the collector stack locally:**
 ```sh
@@ -125,6 +146,18 @@ OTEL_LOGS_EXPORTER=console claude --version
 | `curl` | yes | Downloading `bin/recommended-statusline.sh`; required by the statusline at runtime |
 | `jq` >= 1.6 | yes | Merging `statusLine` hook config into `~/.claude/settings.json` |
 | `awk`, `date`, `basename`, `dirname`, `sed`, `tail` | yes | Runtime dependencies of the installed statusline script |
+
+### `install-safe-bash-hook.sh` (safe-bash-hook installer)
+
+| Dependency | Required | Used for |
+|---|---|---|
+| `bash` | yes | Script runs under bash |
+| `claude` | yes | Confirms Claude Code is installed before proceeding |
+| `curl` | yes | Downloading binary from GitHub Releases; downloading patterns file |
+| `jq` >= 1.6 | yes | Merging hook config + deny list into `~/.claude/settings.json` |
+| `file`, `xxd` or `od` | no | Binary format validation (falls back to warn-and-continue if missing) |
+
+Note: `cargo`/Rust is a **build-time dependency only** (for maintainers building releases). End users only need the above.
 
 ### `bin/apollo-claude` (optional CLI wrapper)
 

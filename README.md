@@ -151,6 +151,62 @@ Then re-run the installer.
 **claude not installed**
 Install Claude Code first: https://docs.anthropic.com/en/docs/claude-code/getting-started
 
+## Optional: Safe-bash hook (defense-in-depth for Bash commands)
+
+`install-safe-bash-hook.sh` installs `safe-bash-hook`, a compiled Rust binary that runs as a Claude Code `PreToolUse` hook. It inspects every Bash command before execution and blocks dangerous patterns that can slip through the deny list.
+
+### Why three layers?
+
+Claude Code permissions use prefix matching, which means compound commands like `git status && rm -rf /` are not blocked by a `Bash(rm -rf *)` deny entry — only the first token is checked. The hook closes this gap:
+
+| Layer | Mechanism | What it catches |
+|---|---|---|
+| 1. Allow list | `Bash(*)` | Fast pass-through for all Bash commands (low friction) |
+| 2. Deny list | `Bash(rm -rf *)`, etc. | Prefix-matches obvious destructive commands |
+| 3. PreToolUse hook | `safe-bash-hook` binary | Compound commands (`&&`, `\|\|`, `;`, pipes), embedded shell (`bash -c "…"`), and any pattern in the deny list that bypasses prefix matching |
+
+### Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install-safe-bash-hook.sh | bash
+```
+
+The installer:
+- Detects your OS + architecture (Linux amd64/arm64, macOS Intel/Apple Silicon)
+- Downloads the pre-compiled binary from GitHub Releases
+- Installs to `~/.claude/hooks/safe-bash-hook`
+- Downloads the initial `safe-bash-patterns.json` (extended patterns, auto-updated hourly)
+- Merges the `PreToolUse` hook config and deny list into `~/.claude/settings.json`
+
+Restart Claude Code after installing.
+
+### How it works
+
+On each Bash tool call, Claude Code pipes a JSON envelope to `safe-bash-hook` on stdin:
+```json
+{"tool_name": "Bash", "tool_input": {"command": "git status && rm -rf /"}}
+```
+
+The hook checks the full command string and each compound segment independently. If a dangerous pattern matches, it exits 2 with a reason on stderr (fed back to Claude). Otherwise exits 0 (allow).
+
+### Custom patterns
+
+The hook loads additional patterns from `~/.claude/hooks/safe-bash-patterns.json` (fetched hourly from this repo). You can also edit the file directly to add your own:
+
+```json
+{
+  "version": 1,
+  "deny": [
+    {"pattern": "\\bdeploy\\.sh\\b", "reason": "Run deploy.sh manually — don't let Claude deploy"}
+  ],
+  "allow": [
+    {"pattern": "^git log\\b", "reason": "Override: always allow read-only git log"}
+  ]
+}
+```
+
+`allow` patterns override `deny` patterns in the config file, but **cannot override the hardcoded patterns** built into the binary (those are always enforced).
+
 ## Optional: CLI wrapper
 
 `install-apollo-claude-wrapper.sh` installs `apollo-claude`, a thin bash wrapper that also injects telemetry but with auth isolation — it stores Claude credentials in `~/.apollo-claude/` separately from `~/.claude/`, and includes an auto-update mechanism. Most developers don't need this; use it only if you need a separate Claude auth session (e.g. a team subscription billed separately from personal usage).
@@ -169,16 +225,32 @@ curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/in
 apollo-claude/
 ├── setup-apollotech-otel-for-claude.sh  # Primary installer
 ├── apollotech-otel-headers.sh           # Auth + repo-detection helper (downloaded to ~/.claude/)
+├── safe-bash-patterns.json              # Remote patterns for safe-bash-hook (fetched hourly)
+├── recommended-settings.json           # Example ~/.claude/settings.json (permissions + hook)
+├── install-safe-bash-hook.sh           # Installer for the safe-bash-hook binary
+├── install-statusline.sh               # Installer for the Claude Code statusline
+├── install-apollo-claude-wrapper.sh    # Installer for the optional CLI wrapper
+├── install_collector.sh                # Automated collector stack installer
+├── hooks/
+│   └── safe-bash/                      # Rust source for safe-bash-hook binary
+│       ├── Cargo.toml
+│       ├── build.sh                    # Cross-compilation script
+│       ├── test.sh                     # Shell integration test runner
+│       └── src/
+│           ├── main.rs
+│           ├── patterns.rs             # Hardcoded pattern definitions + matching
+│           ├── config.rs               # Optional config file loading
+│           └── autoupdate.rs           # Background hourly pattern update
 ├── collector/
-│   ├── docker-compose.yml               # OTel Collector + Loki + Grafana
-│   ├── htpasswd                         # Per-developer credentials (basic auth)
-│   ├── nginx-site.conf                  # Nginx reverse proxy template
+│   ├── docker-compose.yml              # OTel Collector + Loki + Grafana
+│   ├── htpasswd                        # Per-developer credentials (basic auth)
+│   ├── nginx-site.conf                 # Nginx reverse proxy template
 │   ├── otel-collector-config.yaml
 │   └── loki-config.yaml
 ├── bin/
-│   └── apollo-claude                    # Optional CLI wrapper
-├── install-apollo-claude-wrapper.sh     # Installer for the optional CLI wrapper
-├── install_collector.sh                 # Automated collector stack installer
+│   ├── apollo-claude                   # Optional CLI wrapper
+│   ├── recommended-statusline.sh       # Claude Code statusline script
+│   └── release                         # Release automation script
 ├── CLAUDE.md
 ├── VERSION
 └── SETUP.md
