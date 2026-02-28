@@ -394,16 +394,17 @@ format_utilization() {
         fi
 
         # Convert to days (fractional)
-        days_remaining=$(awk "BEGIN {printf \"%.2f\", $seconds_remaining / 86400}")
+        days_remaining=$(awk "BEGIN {d = $seconds_remaining / 86400; printf \"%.2f\", (d > 7 ? 7 : d)}")
         days_elapsed=$(awk "BEGIN {printf \"%.2f\", 7 - $days_remaining}")
 
         # Sustainable threshold = days_elapsed × 14.28%
         local sustainable_threshold
         sustainable_threshold=$(awk "BEGIN {printf \"%.2f\", $days_elapsed * 14.28}")
 
-        # Show warning if current utilization exceeds sustainable threshold
+        # Show warning if current utilization exceeds sustainable threshold.
+        # Require at least 1 day elapsed: less data than that makes pace prediction too noisy.
         local exceeds_threshold
-        exceeds_threshold=$(awk "BEGIN {print ($seven_day_util > $sustainable_threshold) ? 1 : 0}")
+        exceeds_threshold=$(awk "BEGIN {print ($days_elapsed >= 1 && $seven_day_util > $sustainable_threshold) ? 1 : 0}")
 
         if [ "$exceeds_threshold" -eq 1 ]; then
             local seven_day_remaining seven_reset_fmt
