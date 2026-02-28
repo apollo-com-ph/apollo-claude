@@ -169,19 +169,24 @@ Claude Code permissions use prefix matching, which means compound commands like 
 
 - **Destructive file ops** — `rm -rf`, `rm -r`, `mkfs`, `dd`, `shred`
 - **Destructive git** — force push, `reset --hard`, `checkout --`
+- **Permission bombs** — `chmod -R 777`, `chmod 777 /`
 - **Privilege escalation** — `sudo`, `su`, `pkexec`, `doas`, SUID/SGID bit setting
-- **Core credential reads** — SSH keys, AWS/GCP/Azure credentials, `.env` files, `/etc/shadow`, Claude credentials
+- **Core credential reads** — SSH keys, AWS credentials, `.env` files, `/etc/shadow`, Claude credentials, `apollotech-config`
 - **Exfiltration** — pipe to curl/shell, `curl --data @file`, `curl -T`
 - **Shell injection** — `eval`, `bash -c` with destructive payloads, pipe to shell interpreters
-- **Persistence** — `crontab`, `at`/`batch`, `systemctl enable/start`
-- **Container escape** — `docker run --privileged`, host root mounts, Docker socket mounts
+- **File truncation** — `> file` redirects
+- **In-place edits** — `sed -i`
+- **Persistence** — `crontab`
+- **Container escape** — `docker run --privileged`
 - **System** — fork bombs, `shutdown`, `reboot`, `kill -9 -1`
 
 **Blocked by default, overridable via `allow` rules in `safe-bash-patterns.json`:**
 
 - **Destructive git ops** — `git clean`, `git restore`, `git branch -D`, `gh api DELETE/PUT/POST`, `rmdir`
 - **Network transfer tools** — `netcat`, `scp`, `sftp`, `ftp`, `socat`, `telnet`
-- **Additional credential reads** — GPG keys, GitHub CLI tokens, `.git-credentials`, `.netrc`
+- **Cloud/service credential reads** — GCP, Azure, `.npmrc`, `.pypirc`, Docker config, kubeconfig, 1Password, GPG keys, GitHub CLI tokens, `.git-credentials`, `.netrc`
+- **Persistence** — `at`/`batch`, `systemctl`, `launchctl`
+- **Container escape** — Docker socket mounts, host root mounts
 
 ### Install
 
