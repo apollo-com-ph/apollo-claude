@@ -245,10 +245,32 @@ curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/in
 
 `collector/` contains the OTel backend stack (OTel Collector + Loki + Grafana). To deploy on a fresh Ubuntu 22.04+ server, run `bash install_collector.sh` — it automates the full setup (packages, Docker, firewall, nginx, TLS, first developer). See [SETUP.md](./SETUP.md) for manual deployment instructions.
 
+## Development
+
+Run the full test suite from the repo root:
+
+```sh
+make test
+```
+
+This runs four steps in order:
+
+| Target | What it runs |
+|---|---|
+| `make syntax-check` | `bash -n` / `sh -n` on all shell scripts |
+| `make test-rust` | `cargo test` for the safe-bash-hook binary (201 unit + integration tests) |
+| `make test-shell` | 141 shell tests in `tests/test-*.sh` |
+| `make test-safe-bash-shell` | `hooks/safe-bash/test.sh` against the compiled binary |
+
+You can also run any step individually, e.g. `make test-shell` to iterate on shell tests without a Rust build.
+
+The shell tests cover: `version_gte()`, statusline formatters, config-file parsing, git URL normalization, `settings.json` jq merge logic, `apollotech-otel-headers.sh` end-to-end, all 49 remote deny patterns + 4 allow overrides, download validation, and platform detection.
+
 ## Project structure
 
 ```
 apollo-claude/
+├── Makefile                             # Test orchestration (make test)
 ├── setup-apollotech-otel-for-claude.sh  # Primary installer
 ├── apollotech-otel-headers.sh           # Auth + repo-detection helper (downloaded to ~/.claude/)
 ├── safe-bash-patterns.json              # Remote patterns for safe-bash-hook (fetched hourly)
@@ -257,6 +279,17 @@ apollo-claude/
 ├── install-statusline.sh               # Installer for the Claude Code statusline
 ├── install-apollo-claude-wrapper.sh    # Installer for the optional CLI wrapper
 ├── install_collector.sh                # Automated collector stack installer
+├── tests/
+│   ├── test-lib.sh                     # Shared assertion library
+│   ├── test-version-gte.sh             # version_gte() tests
+│   ├── test-statusline-formatters.sh   # format_model/percentage/cost/project_dir
+│   ├── test-config-parsing.sh          # IFS='=' read config loop
+│   ├── test-repo-url-normalization.sh  # sed URL regex
+│   ├── test-settings-json-merge.sh     # jq merge logic (all 3 installers)
+│   ├── test-otel-headers.sh            # apollotech-otel-headers.sh end-to-end
+│   ├── test-remote-patterns.sh         # safe-bash-patterns.json deny/allow
+│   ├── test-download-validation.sh     # shebang + syntax + non-empty checks
+│   └── test-platform-detection.sh      # uname → artifact name mapping
 ├── hooks/
 │   └── safe-bash/                      # Rust source for safe-bash-hook binary
 │       ├── Cargo.toml
