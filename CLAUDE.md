@@ -64,10 +64,20 @@ The collector stack in `collector/` (docker-compose with OTel Collector, Loki, G
 - `hooks/safe-bash/` — Rust source for the `safe-bash-hook` binary. Two-tier pattern model: 52 hardcoded patterns (always enforced, cannot be overridden) + remote config patterns from `safe-bash-patterns.json` (blocked by default, overridable via `allow` rules). Exits 0 (allow) or 2 (block). Cross-compiled for Linux amd64/arm64 and macOS Intel/Apple Silicon. See `hooks/safe-bash/build.sh` for release builds.
 - `bin/release` — release automation script. Bumps `VERSION` and `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`, syntax-checks the wrapper and `install-safe-bash-hook.sh`, then commits and pushes.
 - `VERSION` — single integer, monotonically increasing. Must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
+- `Makefile` — test orchestration. `make test` runs syntax-check → cargo test → shell tests → safe-bash-hook shell tests.
+- `tests/test-lib.sh` — shared assertion library for shell tests (`assert_eq`, `assert_exit`, `assert_stdout_eq`, `assert_stdout_contains`, `test_summary`).
+- `tests/test-*.sh` — shell test suite (141 tests across 9 files). Covers `version_gte()`, statusline formatters, config-file parsing, git URL normalization, `settings.json` jq merge logic, `apollotech-otel-headers.sh` end-to-end, all remote deny/allow patterns, download validation, and platform detection.
 
 ## Development
 
 The project is primarily shell scripts with one Rust binary (`hooks/safe-bash/`).
+
+**Run all tests:**
+```sh
+make test
+```
+
+This runs four steps in order: `syntax-check` → `test-rust` → `test-shell` → `test-safe-bash-shell`. Each step can also be run individually (e.g. `make test-shell` to iterate on shell tests without a Rust build).
 
 **Syntax-check all scripts:**
 ```sh
