@@ -162,17 +162,18 @@ Claude Code permissions use prefix matching, which means compound commands like 
 | Layer | Mechanism | What it catches |
 |---|---|---|
 | 1. Allow list | `Bash(*)` | Fast pass-through for all Bash commands (low friction) |
-| 2. Deny list | `Bash(rm -rf *)`, `Bash(sudo *)`, etc. | Prefix-matches destructive commands and privilege escalation |
+| 2. Deny list | `Bash(rm -rf *)`, `Write(~/.claude/**)`, `Read(~/.ssh/**)`, etc. | Prefix-matches destructive Bash commands; also blocks Write/Edit/Read access to Claude config, shell dotfiles, SSH keys, and credential stores |
 | 3. PreToolUse hook | `safe-bash-hook` binary | Compound commands, credential reads, exfiltration vectors, privilege escalation, persistence, container escape |
 
 **Always blocked (hardcoded in the binary — cannot be overridden):**
 
-- **Destructive file ops** — `rm -rf`, `rm -r`, `mkfs`, `dd`, `shred`
-- **Destructive git** — force push, `reset --hard`, `checkout --`
+- **Destructive file ops** — `rm -rf`, `rm -r`, `mkfs`, `dd`, `shred`, `find -delete`, `find -exec rm`, `/bin/rm -rf`, `truncate`, `mv`/`cp` to `/dev/null`
+- **Destructive git** — force push (`--force`, `-f`, `+refspec`), `reset --hard`, `checkout --`
 - **Permission bombs** — `chmod -R 777`, `chmod 777 /`
 - **Privilege escalation** — `sudo`, `su`, `pkexec`, `doas`, SUID/SGID bit setting
 - **Core credential reads** — SSH keys, AWS credentials, `.env` files, `/etc/shadow`, Claude credentials, `apollotech-config`
-- **Exfiltration** — pipe to curl/shell, `curl --data @file`, `curl -T`
+- **Environment dumping** — `printenv`, bare `env` (expose secrets in environment)
+- **Exfiltration** — pipe to curl/shell, `curl --data @file`, `curl -T`, pipe to `tee <file>`
 - **Shell injection** — `eval`, `bash -c` with destructive payloads, pipe to shell interpreters
 - **File truncation** — `> file` redirects
 - **In-place edits** — `sed -i`
@@ -185,6 +186,8 @@ Claude Code permissions use prefix matching, which means compound commands like 
 - **Destructive git ops** — `git clean`, `git restore`, `git branch -D`, `gh api DELETE/PUT/POST`, `rmdir`
 - **Network transfer tools** — `netcat`, `scp`, `sftp`, `ftp`, `socat`, `telnet`
 - **Cloud/service credential reads** — GCP, Azure, `.npmrc`, `.pypirc`, Docker config, kubeconfig, 1Password, GPG keys, GitHub CLI tokens, `.git-credentials`, `.netrc`
+- **Alternative credential readers** — `xxd`, `strings`, `base64`, `od` against SSH keys, AWS credentials, `.env` files
+- **Supply chain** — `npm publish`, `gh release create`
 - **Persistence** — `at`/`batch`, `systemctl`, `launchctl`
 - **Container escape** — Docker socket mounts, host root mounts
 
@@ -218,7 +221,7 @@ The hook loads additional patterns from `~/.claude/hooks/safe-bash-patterns.json
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "deny": [
     {"pattern": "\\bdeploy\\.sh\\b", "reason": "Run deploy.sh manually — don't let Claude deploy"}
   ],

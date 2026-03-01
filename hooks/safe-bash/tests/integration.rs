@@ -222,6 +222,58 @@ fn non_bash_tool_allowed() {
 }
 
 // ---------------------------------------------------------------------------
+// New patterns
+// ---------------------------------------------------------------------------
+
+#[test]
+fn allows_git_push_force_with_lease() {
+    let (code, _) = run(&bash_input("git push --force-with-lease origin main"));
+    assert_eq!(code, 0, "git push --force-with-lease should be allowed");
+}
+
+#[test]
+fn blocks_find_delete() {
+    let (code, _) = run(&bash_input("find /tmp -name '*.log' -delete"));
+    assert_eq!(code, 2);
+}
+
+#[test]
+fn blocks_git_push_plus_refspec() {
+    let (code, _) = run(&bash_input("git push origin +main"));
+    assert_eq!(code, 2);
+}
+
+#[test]
+fn blocks_bin_rm_rf() {
+    let (code, _) = run(&bash_input("/bin/rm -rf /tmp/foo"));
+    assert_eq!(code, 2);
+}
+
+#[test]
+fn blocks_truncate() {
+    let (code, _) = run(&bash_input("truncate -s 0 file.txt"));
+    assert_eq!(code, 2);
+}
+
+#[test]
+fn blocks_printenv() {
+    let (code, _) = run(&bash_input("printenv"));
+    assert_eq!(code, 2);
+}
+
+#[test]
+fn blocks_tee_overwrite() {
+    let (code, _) = run(&bash_input("echo data | tee output.txt"));
+    assert_eq!(code, 2);
+}
+
+#[test]
+fn allows_tee_append() {
+    let (code, _) = run(&bash_input("echo data | tee -a log.txt"));
+    assert_eq!(code, 0);
+}
+
+// ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
 

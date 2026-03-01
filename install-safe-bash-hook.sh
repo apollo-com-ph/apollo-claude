@@ -245,7 +245,49 @@ DENY_LIST='[
   "Bash(doas *)",
   "Bash(scp *)",
   "Bash(crontab *)",
-  "Bash(docker run --privileged *)"
+  "Bash(docker run --privileged *)",
+
+  "Write(~/.claude/settings.json)",
+  "Write(~/.claude/settings.local.json)",
+  "Write(~/.claude/hooks/**)",
+  "Write(~/.claude/apollotech-config)",
+  "Write(~/.claude/.credentials*)",
+  "Write(~/.apollo-claude/**)",
+  "Edit(~/.claude/settings.json)",
+  "Edit(~/.claude/settings.local.json)",
+  "Edit(~/.claude/hooks/**)",
+  "Edit(~/.claude/apollotech-config)",
+  "Edit(~/.claude/.credentials*)",
+  "Edit(~/.apollo-claude/**)",
+
+  "Write(~/.bashrc)",
+  "Write(~/.zshrc)",
+  "Write(~/.profile)",
+  "Write(~/.bash_profile)",
+  "Edit(~/.bashrc)",
+  "Edit(~/.zshrc)",
+  "Edit(~/.profile)",
+  "Edit(~/.bash_profile)",
+
+  "Write(~/.ssh/**)",
+  "Edit(~/.ssh/**)",
+
+  "Read(~/.ssh/**)",
+  "Read(~/.aws/**)",
+  "Read(~/.claude/.credentials*)",
+  "Read(~/.claude/apollotech-config)",
+  "Read(~/.apollo-claude/config)",
+  "Read(~/.gnupg/**)",
+  "Read(~/.config/gh/**)",
+  "Read(~/.git-credentials)",
+  "Read(~/.netrc)",
+  "Read(~/.npmrc)",
+  "Read(~/.pypirc)",
+  "Read(~/.docker/config.json)",
+  "Read(~/.kube/config)",
+  "Read(~/.config/gcloud/**)",
+  "Read(~/.azure/**)",
+  "Read(//etc/shadow)"
 ]'
 
 if [ -f "$SETTINGS_JSON" ]; then
@@ -258,7 +300,7 @@ if [ -f "$SETTINGS_JSON" ]; then
     # Merge hooks config and permission deny list (additive)
     jq --argjson hooks "$HOOK_CONFIG" \
        --argjson deny "$DENY_LIST" \
-      '.hooks = ($hooks + (.hooks // {})) |
+      '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + $hooks.PreToolUse | unique_by(.hooks[0].command)) |
        .permissions.deny = ((.permissions.deny // []) + $deny | unique)' \
       "$SETTINGS_JSON" > "$tmpjson" \
       || fail "Failed to update settings.json."

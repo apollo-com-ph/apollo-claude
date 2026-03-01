@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "deny": [
     {"pattern": "\\brm\\s+-(rf|fr)\\b", "reason": "Destructive: rm -rf"},
-    {"pattern": "\\bgit\\s+push\\s+(-f|--force)\\b", "reason": "Destructive: git force push"},
+    {"pattern": "\\bgit\\s+push\\s+(-f\\b|--force(?:[ \\t]|$))", "reason": "Destructive: git force push"},
     {"pattern": "\\bwget\\b.*-O\\s*-.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: wget pipe to shell"},
     {"pattern": "\\bcurl\\b.*\\|\\s*(ba)?sh\\b", "reason": "Shell injection: curl pipe to shell"},
 
@@ -37,7 +37,7 @@
     {"pattern": "(?i)\\brmdir\\b", "reason": "Destructive: rmdir"},
     {"pattern": "(?i)\\bgit\\s+clean\\b", "reason": "Destructive: git clean"},
     {"pattern": "(?i)\\bgit\\s+restore\\b", "reason": "Destructive: git restore"},
-    {"pattern": "(?i)\\bgit\\s+branch\\s+(-D|--delete\\s+-f)\\b", "reason": "Destructive: git branch -D"},
+    {"pattern": "\\bgit\\s+branch\\s+(-D|--delete\\s+-f)\\b", "reason": "Destructive: git branch -D (force delete)"},
     {"pattern": "(?i)\\b(nc|netcat)\\s+", "reason": "Exfiltration: netcat"},
     {"pattern": "(?i)\\bgh\\s+api\\s+.*-X\\s+DELETE\\b", "reason": "Destructive: gh api DELETE"},
     {"pattern": "(?i)\\bgh\\s+api\\s+.*-X\\s+PUT\\b", "reason": "Destructive: gh api PUT"},
@@ -50,11 +50,17 @@
     {"pattern": "(?i)(?:^|[\\s;|&])\\s*sftp\\b", "reason": "Exfiltration: sftp file transfer"},
     {"pattern": "(?i)(?:^|[\\s;|&])\\s*ftp\\b", "reason": "Exfiltration: ftp file transfer"},
     {"pattern": "(?i)(?:^|[\\s;|&])\\s*socat\\b", "reason": "Exfiltration: socat network relay"},
-    {"pattern": "(?i)(?:^|[\\s;|&])\\s*telnet\\b", "reason": "Exfiltration: telnet connection"}
+    {"pattern": "(?i)(?:^|[\\s;|&])\\s*telnet\\b", "reason": "Exfiltration: telnet connection"},
+    {"pattern": "(?i)\\b(xxd|strings|base64|od)\\s+.*~?/?\\.?ssh/", "reason": "Sensitive: reading SSH key via alternative tool"},
+    {"pattern": "(?i)\\b(xxd|strings|base64|od)\\s+.*~?/?\\.?aws/", "reason": "Sensitive: reading AWS credentials via alternative tool"},
+    {"pattern": "(?i)\\b(xxd|strings|base64|od)\\s+.*\\.env\\b", "reason": "Sensitive: reading .env via alternative tool"},
+    {"pattern": "(?i)\\bnpm\\s+publish\\b", "reason": "Supply chain: npm publish"},
+    {"pattern": "(?i)\\bgh\\s+release\\s+create\\b", "reason": "Supply chain: gh release create"}
   ],
   "allow": [
     {"pattern": "^git log\\b", "reason": "Safe: read-only git log"},
     {"pattern": "^git show\\b", "reason": "Safe: read-only git show"},
-    {"pattern": "^git diff\\b", "reason": "Safe: read-only git diff"}
+    {"pattern": "^git diff\\b", "reason": "Safe: read-only git diff"},
+    {"pattern": "^git push --force-with-lease\\b", "reason": "Safe: --force-with-lease is safer force push variant"}
   ]
 }

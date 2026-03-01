@@ -28,10 +28,20 @@ pub fn hardcoded_deny_patterns() -> Vec<DenyPattern> {
         DenyPattern::new(r"(?i)\bdd\s+if=", "Destructive: dd if= (disk write)"),
         DenyPattern::new(r"(?i)\bshred\b", "Destructive: shred (secure file deletion)"),
 
+        // Destructive file ops — alternatives to rm
+        DenyPattern::new(r"(?i)\bfind\b.*\s-delete\b", "Destructive: find -delete"),
+        DenyPattern::new(r"(?i)\bfind\b.*-exec\s+rm\s", "Destructive: find -exec rm"),
+        DenyPattern::new(r"(?i)(?:^|[\s;|&])\s*/(?:usr/)?s?bin/rm\s+(-\S*[rR]\S*[fF]\S*|-\S*[fF]\S*[rR]\S*|-[rR])\b", "Destructive: /bin/rm -rf"),
+        DenyPattern::new(r"(?i)\btruncate\s+", "Destructive: truncate command"),
+        DenyPattern::new(r"(?i)\bmv\s+.*\s+/dev/null\b", "Destructive: mv to /dev/null"),
+        DenyPattern::new(r"(?i)\bcp\s+/dev/null\s+", "Destructive: cp /dev/null (zeroes file)"),
+
         // Destructive git
-        DenyPattern::new(r"(?i)\bgit\s+push\s+.*(-f|--force)\b", "Destructive: git force push"),
+        DenyPattern::new(r"(?i)\bgit\s+push\s+.*(-f\b|--force(?:[ \t]|$))", "Destructive: git force push"),
         DenyPattern::new(r"(?i)\bgit\s+reset\s+--hard\b", "Destructive: git reset --hard"),
         DenyPattern::new(r"(?i)\bgit\s+checkout\s+--\s", "Destructive: git checkout --"),
+        // Destructive git — plus-sign force push: git push origin +main
+        DenyPattern::new(r"(?i)\bgit\s+push\s+\S+\s+\+", "Destructive: git push +refspec (force push)"),
 
         // Permission bombs
         DenyPattern::new(r"(?i)\bchmod\s+-R\s+777\b", "Dangerous: chmod -R 777"),
@@ -46,6 +56,9 @@ pub fn hardcoded_deny_patterns() -> Vec<DenyPattern> {
         // Exfiltration
         DenyPattern::new(r"(?i)\|\s*curl\s+.*-X\s+POST\b", "Exfiltration: pipe to curl POST"),
         DenyPattern::new(r"(?i)\|\s*curl\b", "Exfiltration: pipe to curl"),
+
+        // File overwrite via tee — block when first arg is a filename (not a flag starting with -)
+        DenyPattern::new(r"(?i)\|\s*tee\s+[^-\s]", "Destructive: pipe to tee (overwrites file)"),
 
         // Sensitive file reads
         DenyPattern::new(r"(?i)\b(cat|head|tail|less|more|bat)\s+.*~?/?\.?ssh/", "Sensitive: reading SSH key"),
@@ -82,6 +95,10 @@ pub fn hardcoded_deny_patterns() -> Vec<DenyPattern> {
         DenyPattern::new(r"(?i)\b(cat|head|tail|less|more|bat)\s+.*/etc/shadow", "Sensitive: reading /etc/shadow"),
         DenyPattern::new(r"(?i)\b(cat|head|tail|less|more|bat)\s+.*~?/?\.?claude/\.credentials", "Sensitive: reading Claude credentials"),
         DenyPattern::new(r"(?i)\b(cat|head|tail|less|more|bat)\s+.*apollotech-config", "Sensitive: reading apollotech-config credentials"),
+
+        // Environment variable dumping (exposes secrets in env)
+        DenyPattern::new(r"(?i)(?:^|[\s;|&])\s*printenv\b", "Sensitive: printenv dumps env vars"),
+        DenyPattern::new(r"(?i)(?:^|[\s;|&])\s*env\s*$", "Sensitive: bare env dumps env vars"),
 
         // Non-pipe exfiltration — curl file upload without piping
         // (extends existing pipe-to-curl patterns at lines 51-52)
@@ -668,5 +685,84 @@ mod tests {
     fn split_or() {
         let segs = split_command("false || true");
         assert_eq!(segs, vec!["false", "true"]);
+    }
+
+    // --- New: force-with-lease (should ALLOW) ---
+
+    #[test]
+    fn git_push_force_with_lease_allowed() {
+        assert!(is_allowed("git push --force-with-lease origin main"));
+    }
+
+    #[test]
+    fn git_push_force_if_includes_allowed() {
+        assert!(is_allowed("git push --force-if-includes origin main"));
+    }
+
+    // --- New: destructive alternatives ---
+
+    #[test]
+    fn find_delete_blocked() {
+        assert!(is_blocked("find /tmp -name '*.log' -delete"));
+    }
+
+    #[test]
+    fn find_exec_rm_blocked() {
+        assert!(is_blocked("find . -exec rm -rf {} ;"));
+    }
+
+    #[test]
+    fn git_push_plus_refspec_blocked() {
+        assert!(is_blocked("git push origin +main"));
+    }
+
+    #[test]
+    fn bin_rm_rf_blocked() {
+        assert!(is_blocked("/bin/rm -rf /tmp/foo"));
+    }
+
+    #[test]
+    fn usr_bin_rm_rf_blocked() {
+        assert!(is_blocked("/usr/bin/rm -rf /tmp/foo"));
+    }
+
+    #[test]
+    fn truncate_blocked() {
+        assert!(is_blocked("truncate -s 0 important.txt"));
+    }
+
+    #[test]
+    fn mv_dev_null_blocked() {
+        assert!(is_blocked("mv secret.txt /dev/null"));
+    }
+
+    #[test]
+    fn cp_dev_null_blocked() {
+        assert!(is_blocked("cp /dev/null important.txt"));
+    }
+
+    #[test]
+    fn tee_overwrite_blocked() {
+        assert!(is_blocked("echo data | tee output.txt"));
+    }
+
+    #[test]
+    fn tee_append_allowed() {
+        assert!(is_allowed("echo data | tee -a log.txt"));
+    }
+
+    #[test]
+    fn printenv_blocked() {
+        assert!(is_blocked("printenv"));
+    }
+
+    #[test]
+    fn env_bare_blocked() {
+        assert!(is_blocked("env"));
+    }
+
+    #[test]
+    fn env_with_var_assignment_allowed() {
+        assert!(is_allowed("env LANG=C sort file.txt"));
     }
 }

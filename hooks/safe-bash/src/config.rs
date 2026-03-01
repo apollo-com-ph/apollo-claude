@@ -90,17 +90,38 @@ pub fn load_config(path: &Path) -> CompiledConfig {
 /// Returns Ok(()) if allowed, Err(reason) if denied.
 /// allow overrides deny, but neither overrides the hardcoded patterns (handled by caller).
 pub fn check_config(cmd: &str, config: &CompiledConfig) -> Result<(), String> {
-    // If an allow pattern matches, this config layer passes unconditionally.
+    // If an allow pattern matches the full command, this config layer passes unconditionally.
     for p in &config.allow {
         if p.re.is_match(cmd) {
             return Ok(());
         }
     }
 
-    // Check config deny patterns.
+    // Check config deny patterns against the full command.
     for p in &config.deny {
         if p.re.is_match(cmd) {
             return Err(p.reason.clone());
+        }
+    }
+
+    // Also check each split segment (catches compound commands like "echo ok && forbidden")
+    let segments = crate::patterns::split_command(cmd);
+    for segment in &segments {
+        // Check allow first for this segment
+        let mut segment_allowed = false;
+        for p in &config.allow {
+            if p.re.is_match(segment) {
+                segment_allowed = true;
+                break;
+            }
+        }
+        if segment_allowed {
+            continue;
+        }
+        for p in &config.deny {
+            if p.re.is_match(segment) {
+                return Err(p.reason.clone());
+            }
         }
     }
 
@@ -191,5 +212,29 @@ mod tests {
         let config = load_config(f.path());
         // The valid pattern should still be loaded
         assert_eq!(config.deny.len(), 1);
+    }
+
+    #[test]
+    fn config_deny_catches_compound_command() {
+        let json = r#"{"deny":[{"pattern":"^forbidden\\b","reason":"deny forbidden at start"}],"allow":[]}"#;
+        let f = write_config(json);
+        let config = load_config(f.path());
+        // "echo ok && forbidden thing" — full command does NOT start with "forbidden"
+        // but after splitting, the segment "forbidden thing" does
+        assert!(check_config("echo ok && forbidden thing", &config).is_err());
+    }
+
+    #[test]
+    fn config_allow_works_per_segment() {
+        let json = r#"{
+            "deny":[{"pattern":"\\bgit\\s+clean\\b","reason":"deny git clean"}],
+            "allow":[{"pattern":"^git log\\b","reason":"safe read-only"}]
+        }"#;
+        let f = write_config(json);
+        let config = load_config(f.path());
+        // "git clean" should be blocked
+        assert!(check_config("git clean -fd", &config).is_err());
+        // "git log" should be allowed even with compound
+        assert!(check_config("git log --oneline", &config).is_ok());
     }
 }

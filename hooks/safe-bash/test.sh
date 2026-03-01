@@ -86,6 +86,16 @@ run_test 'crontab -e'                        2 'crontab -e'
 run_test 'crontab -l'                        2 'crontab -l'
 run_test 'docker run --privileged'           2 'docker run --privileged ubuntu bash'
 run_test 'compound: echo && sudo rm'         2 'echo hello && sudo rm /etc/hosts'
+run_test 'find -delete'                        2 'find /tmp -name "*.log" -delete'
+run_test 'find -exec rm'                       2 'find . -exec rm -rf {} ;'
+run_test 'git push +refspec'                   2 'git push origin +main'
+run_test '/bin/rm -rf'                         2 '/bin/rm -rf /tmp/foo'
+run_test 'truncate -s 0'                       2 'truncate -s 0 important.txt'
+run_test 'mv to /dev/null'                     2 'mv secret.txt /dev/null'
+run_test 'cp /dev/null'                        2 'cp /dev/null important.txt'
+run_test 'printenv'                            2 'printenv'
+run_test 'env (bare)'                          2 'env'
+run_test 'pipe to tee (overwrite)'             2 'echo data | tee output.txt'
 
 printf '\n'
 
@@ -116,6 +126,10 @@ run_test 'curl inline data (no @)'          0 "curl -d '{\"key\":\"val\"}' https
 run_test 'docker run normal'                0 'docker run -it ubuntu bash'
 run_test 'suspend (not su)'                 0 'suspend'
 run_test 'sum (not su)'                     0 'sum file.txt'
+run_test 'git push --force-with-lease'         0 'git push --force-with-lease origin main'
+run_test 'git push --force-if-includes'        0 'git push --force-if-includes origin main'
+run_test 'tee -a (append)'                     0 'echo data | tee -a log.txt'
+run_test 'env VAR=val cmd'                     0 'env LANG=C sort file.txt'
 
 printf '\n'
 
