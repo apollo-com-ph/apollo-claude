@@ -281,7 +281,7 @@ OTEL_ENV=$(jq -n \
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
-    "OTEL_RESOURCE_ATTRIBUTES": ("developer=" + $developer + ",team=engineering"),
+    "OTEL_RESOURCE_ATTRIBUTES": ("developer=" + $developer),
     "OTEL_LOG_TOOL_DETAILS": "1"
   }')
 
