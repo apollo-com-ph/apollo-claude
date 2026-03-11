@@ -274,13 +274,16 @@ fi
 ############################################################
 # OTEL Environment Variables
 ############################################################
-OTEL_ENV='{
-  "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-  "OTEL_LOGS_EXPORTER": "otlp",
-  "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
-  "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
-  "OTEL_LOG_TOOL_DETAILS": "1"
-}'
+OTEL_ENV=$(jq -n \
+  --arg developer "${APOLLO_USER}" \
+  '{
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
+    "OTEL_RESOURCE_ATTRIBUTES": ("developer=" + $developer + ",team=engineering"),
+    "OTEL_LOG_TOOL_DETAILS": "1"
+  }')
 
 ############################################################
 # Update settings.json
