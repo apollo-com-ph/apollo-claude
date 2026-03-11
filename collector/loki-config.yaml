@@ -39,6 +39,7 @@ limits_config:
             - service.name
             - event.name
             - user.email
+            - developer
             - model
             - tool_name
             - session.id
