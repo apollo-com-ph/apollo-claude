@@ -68,13 +68,16 @@ echo '{}' > ~/.claude/settings.json
 Then merge the OTEL configuration:
 
 ```bash
-jq '.env = ((.env // {}) + {
-  "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-  "OTEL_LOGS_EXPORTER": "otlp",
-  "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
-  "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
-  "OTEL_LOG_TOOL_DETAILS": "1"
-}) | .otelHeadersHelper = ($ENV.HOME + "/.claude/apollotech-otel-headers.sh")' \
+APOLLO_USER=$(grep '^APOLLO_USER=' ~/.claude/apollotech-config | cut -d= -f2 | tr -d ' ')
+jq --arg dev "developer=${APOLLO_USER}" \
+  '.env = ((.env // {}) + {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://dev-ai.apollotech.co/otel",
+    "OTEL_RESOURCE_ATTRIBUTES": $dev,
+    "OTEL_LOG_TOOL_DETAILS": "1"
+  }) | .otelHeadersHelper = ($ENV.HOME + "/.claude/apollotech-otel-headers.sh")' \
   ~/.claude/settings.json > ~/.claude/settings.json.tmp \
   && mv ~/.claude/settings.json.tmp ~/.claude/settings.json
 ```
