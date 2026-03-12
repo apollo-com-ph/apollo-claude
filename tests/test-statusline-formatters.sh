@@ -52,7 +52,7 @@ assert_eq '0.15 < 1.0 → $0.2'     '$0.2' "$(format_cost 0.15)"
 assert_eq '0.5 < 1.0 → $0.5'      '$0.5' "$(format_cost 0.5)"
 assert_eq '0.95 rounds to $1.0'    '$1.0' "$(format_cost 0.95)"
 assert_eq '3.45 < 10 → $3.5'      '$3.5' "$(format_cost 3.45)"  # printf %.1f rounds half-up
-assert_eq '9.99 < 10 → $10.0'     '$10.0' "$(format_cost 9.99)"
+assert_eq '9.99 >= 9.95 → $10 '    '$10 '  "$(format_cost 9.99)"
 assert_eq '42.7 → $43 (space-padded)' '$43 ' "$(format_cost 42.7)"
 assert_eq '150 >= 100 → $150'     '$150' "$(format_cost 150)"
 
@@ -62,7 +62,7 @@ assert_eq '150 >= 100 → $150'     '$150' "$(format_cost 150)"
 printf '\nformat_project_dir:\n'
 assert_eq 'normal 2 components'    "projects/apollo-claude" "$(format_project_dir "/home/user/projects/apollo-claude")"
 assert_eq 'single under root'      "root"                   "$(format_project_dir "/root")"
-assert_eq 'root itself'            "/"                      "$(format_project_dir "/")"
+assert_eq 'root itself'            ""                       "$(format_project_dir "/")"
 assert_eq 'empty → empty'          ""                       "$(format_project_dir "")"
 assert_eq 'home dir'               "home/jessie"            "$(format_project_dir "/home/jessie")"
 

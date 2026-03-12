@@ -26,7 +26,7 @@ Primary path: `setup-apollotech-otel-for-claude.sh` writes into `~/.claude/` onc
 - `hooks/safe-bash/` — Rust source for `safe-bash-hook` PreToolUse binary. Two tiers: 52 hardcoded patterns (always enforced) + remote config patterns (overridable). Exits 0 (allow) or 2 (block).
 - `install-safe-bash-hook.sh` — downloads platform binary from GitHub Releases, installs to `~/.claude/hooks/safe-bash-hook`, merges hook config + deny list into settings.json.
 - `install-statusline.sh` — downloads `bin/recommended-statusline.sh` to `~/.claude/hooks/statusline.sh`, merges `statusLine` config into settings.json.
-- `bin/recommended-statusline.sh` — statusline script. Reads stdin JSON, fetches OAuth usage from Anthropic API (cached 5 min), outputs `[Model]XX%/$Y.YY (remaining% reset) parent/project`.
+- `bin/recommended-statusline.sh` — statusline script. Reads stdin JSON, fetches OAuth usage from Anthropic API (cached 8 min, flock-protected), outputs `[Model]XX%/$Y.YY (remaining% reset) parent/project`. Also writes `/tmp/statusline.json`.
 - `install-apollo-claude-wrapper.sh` — POSIX sh one-liner installer for the optional CLI wrapper.
 - `bin/apollo-claude` — optional CLI wrapper with auth isolation and auto-update.
 - `install_collector.sh` — Ubuntu-only automated collector stack installer.
