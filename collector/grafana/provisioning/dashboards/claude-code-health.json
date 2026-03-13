@@ -1,0 +1,187 @@
+{
+  "uid": "claude-code-health",
+  "title": "Claude Code - Health",
+  "tags": ["claude-code", "otel", "health"],
+  "timezone": "browser",
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "developer",
+        "label": "Developer",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "developer", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      },
+      {
+        "name": "model",
+        "label": "Model",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "model", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "title": "Summary",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "title": "API Errors",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | developer=~\"$developer\" [$__range]))",
+        "legendFormat": "Errors",
+        "queryType": "instant"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "API Error Rate",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | developer=~\"$developer\" [$__range])) / (sum(count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | developer=~\"$developer\" [$__range])) + sum(count_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" [$__range]))) * 100",
+        "legendFormat": "Error Rate",
+        "queryType": "instant"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "noValue": "0",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 101,
+      "title": "Details",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "title": "API Latency by Model (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (model) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap duration_ms [$__interval])) / sum by (model) (count_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" [$__interval]))",
+        "legendFormat": "{{model}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "API Errors Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "count by (status_code) (count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | developer=~\"$developer\" [$__interval]))",
+        "legendFormat": "{{status_code}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "API Errors by Developer",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "count by (developer) (count_over_time({service_name=\"claude-code\"} | event_name=\"api_error\" | developer=~\"$developer\" [$__interval]))",
+        "legendFormat": "{{developer}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          }
+        }
+      }
+    },
+
+    {
+      "id": 102,
+      "title": "Error Log",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 20,
+      "title": "API Error Log",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "{service_name=\"claude-code\", event_name=\"api_error\"} | developer=~\"$developer\"",
+        "legendFormat": ""
+      }],
+      "transformations": [
+        { "id": "extractFields", "options": { "source": "labels" } },
+        { "id": "sortBy", "options": { "fields": [{ "desc": true, "displayName": "Time" }] } }
+      ],
+      "options": {
+        "sortBy": [{ "desc": true, "displayName": "Time" }]
+      }
+    }
+  ]
+}

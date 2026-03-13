@@ -1,0 +1,229 @@
+{
+  "uid": "claude-code-tools",
+  "title": "Claude Code - Tool Analysis",
+  "tags": ["claude-code", "otel", "tools"],
+  "timezone": "browser",
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "developer",
+        "label": "Developer",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "developer", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      },
+      {
+        "name": "tool",
+        "label": "Tool",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "tool_name", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "title": "Usage",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "title": "Tool Usage Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "count by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" [$__interval]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Tool Success vs Failure",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | is_error=\"false\" [$__interval]))",
+          "legendFormat": "Success"
+        },
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | is_error=\"true\" [$__interval]))",
+          "legendFormat": "Failure"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 30, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Success" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Failure" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 101,
+      "title": "Performance",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "title": "Tool Failure Rate by Tool",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | is_error=\"true\" [$__interval])) / sum by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" [$__interval])) * 100",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Tool Execution Duration (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (sum_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | unwrap duration_ms [$__interval])) / sum by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" [$__interval]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "fillOpacity": 10 }
+        }
+      }
+    },
+
+    {
+      "id": 102,
+      "title": "Decisions",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 20,
+      "title": "Tool Decisions Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"tool_decision\"} | developer=~\"$developer\" | decision=\"accept\" [$__interval]))",
+          "legendFormat": "Accept"
+        },
+        {
+          "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"tool_decision\"} | developer=~\"$developer\" | decision=\"reject\" [$__interval]))",
+          "legendFormat": "Reject"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 30, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Accept" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Reject" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "title": "Tool Decisions by Tool",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "count by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_decision\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | decision=\"accept\" [$__interval]))",
+          "legendFormat": "{{tool_name}} accept"
+        },
+        {
+          "expr": "count by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_decision\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | decision=\"reject\" [$__interval]))",
+          "legendFormat": "{{tool_name}} reject"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 15 }
+        }
+      }
+    },
+    {
+      "id": 22,
+      "title": "Tool Usage Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_use\"} | developer=~\"$developer\" | tool_name=~\"$tool\" [$__range]))",
+        "legendFormat": "{{tool_name}}"
+      }]
+    },
+    {
+      "id": 23,
+      "title": "Rejections by Tool",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (tool_name) (count_over_time({service_name=\"claude-code\", event_name=\"tool_decision\"} | developer=~\"$developer\" | tool_name=~\"$tool\" | decision=\"reject\" [$__range]))",
+        "legendFormat": "{{tool_name}}"
+      }],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
