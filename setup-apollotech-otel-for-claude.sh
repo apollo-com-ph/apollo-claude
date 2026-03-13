@@ -246,9 +246,11 @@ prompt_for_config() {
   fi
   local tmpcfg
   tmpcfg="${CONFIG}.tmp.$$"
-  echo "APOLLO_USER=$APOLLO_USER" > "$tmpcfg"
-  echo "APOLLO_OTEL_TOKEN=$APOLLO_OTEL_TOKEN" >> "$tmpcfg"
-  chmod 600 "$tmpcfg"
+  (umask 077; cat > "$tmpcfg" <<CONF
+APOLLO_USER=${APOLLO_USER}
+APOLLO_OTEL_TOKEN=${APOLLO_OTEL_TOKEN}
+CONF
+)
   atomic_write "$tmpcfg" "$CONFIG"
   info "Credentials saved: $CONFIG"
 }
@@ -269,6 +271,20 @@ if [ ! -f "$CONFIG" ]; then
   prompt_for_config
 else
   info "Config already present: $CONFIG"
+  # Read existing config to populate APOLLO_USER for OTEL_RESOURCE_ATTRIBUTES
+  while IFS='=' read -r key value; do
+    [[ "${key}" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${key// }" ]] && continue
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ "${key}" != APOLLO_* ]] && continue
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    case "${key}" in
+      APOLLO_USER)       APOLLO_USER="${value}" ;;
+      APOLLO_OTEL_TOKEN) APOLLO_OTEL_TOKEN="${value}" ;;
+    esac
+  done < "$CONFIG"
 fi
 
 ############################################################
@@ -311,12 +327,11 @@ update_settings_json() {
     info "Creating $SETTINGS_JSON..."
     local tmpjson
     tmpjson="${SETTINGS_JSON}.tmp.$$"
-    cat > "$tmpjson" <<EOF
-{
-  "env": $(echo "$OTEL_ENV"),
-  "otelHeadersHelper": "$HEADERS_SH_ABS"
-}
-EOF
+    jq -n \
+      --argjson otelenv "$OTEL_ENV" \
+      --arg helper "$HEADERS_SH_ABS" \
+      '{env: $otelenv, otelHeadersHelper: $helper}' > "$tmpjson" \
+      || fail 30 "Failed to create settings.json."
     atomic_write "$tmpjson" "$SETTINGS_JSON"
     info "settings.json created."
   fi
