@@ -33,7 +33,7 @@ Primary path: `setup-apollotech-otel-for-claude.sh` writes into `~/.claude/` onc
 - `recommended-settings.json` — example settings.json with permission defaults (not auto-installed).
 - `Makefile` — `make test` runs syntax-check → cargo test → `tests/test-*.sh` → `hooks/safe-bash/test.sh`.
 - `tests/test-lib.sh` — shared assertion library for shell tests.
-- `tests/test-*.sh` — 141 shell tests across 9 files (version_gte, statusline formatters, config parsing, URL normalization, settings.json jq merge, otel-headers e2e, remote patterns, download validation, platform detection).
+- `tests/test-*.sh` — 176 shell tests across 10 files (version_gte, statusline formatters + format_reset_time/utilization, config parsing, URL normalization, settings.json jq merge, otel-headers e2e, remote patterns, download validation, platform detection, wrapper config + _test_token).
 - `bin/release` — bumps VERSION + APOLLO_CLAUDE_VERSION, syntax-checks, commits and pushes.
 - `VERSION` — monotonically increasing integer; must match `APOLLO_CLAUDE_VERSION` in `bin/apollo-claude`.
 
@@ -78,7 +78,7 @@ OTEL_LOGS_EXPORTER=console claude --version  # debug telemetry (prints to stdout
 
 All installers require `bash`, `claude`, `jq` ≥ 1.6, and `curl` (or `wget` for setup). Additional per-script deps:
 - **setup**: `base64`, `git` (optional, for repo detection), coreutils (`grep`, `sed`, `tr`, `basename`, `date`, `chmod`, `cp`, `mkdir`, `mv`)
-- **statusline installer**: `curl`, `awk`, `date`, `basename`, `dirname`, `sed`, `tail`
+- **statusline installer**: `curl`, `awk`, `date`, `basename`, `dirname`, `sed`, `tail`; `flock` (optional, Linux concurrent-fetch guard — skipped gracefully on macOS)
 - **safe-bash-hook installer**: `curl`; `file`/`xxd`/`od` optional (binary validation)
 - **wrapper**: `curl` or `wget`, `grep`, `sed`, `date`, `stat`, `mktemp`, `head`, `cut`, `base64`, `git` (optional)
 

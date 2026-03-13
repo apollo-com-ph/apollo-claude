@@ -9,6 +9,9 @@
 # Auto-update temp files
 bin/.apollo-claude.tmp.*
 
+# safe-bash-hook compiled outputs
+hooks/safe-bash/dist/
+
 # Docker / collector runtime
 collector/data/
 

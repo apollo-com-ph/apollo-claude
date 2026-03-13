@@ -261,13 +261,13 @@ This runs four steps in order:
 | Target | What it runs |
 |---|---|
 | `make syntax-check` | `bash -n` / `sh -n` on all shell scripts |
-| `make test-rust` | `cargo test` for the safe-bash-hook binary (201 unit + integration tests) |
-| `make test-shell` | 141 shell tests in `tests/test-*.sh` |
+| `make test-rust` | `cargo test` for the safe-bash-hook binary (150 unit + integration tests) |
+| `make test-shell` | 176 shell tests in `tests/test-*.sh` |
 | `make test-safe-bash-shell` | `hooks/safe-bash/test.sh` against the compiled binary |
 
 You can also run any step individually, e.g. `make test-shell` to iterate on shell tests without a Rust build.
 
-The shell tests cover: `version_gte()`, statusline formatters, config-file parsing, git URL normalization, `settings.json` jq merge logic, `apollotech-otel-headers.sh` end-to-end, all 49 remote deny patterns + 4 allow overrides, download validation, and platform detection.
+The shell tests cover: `version_gte()`, statusline formatters (including `format_reset_time` and `format_utilization`), config-file parsing, git URL normalization, `settings.json` jq merge logic, `apollotech-otel-headers.sh` end-to-end, all 49 remote deny patterns + 4 allow overrides, download validation, platform detection, and wrapper config-reading + `_test_token` logic.
 
 ## Project structure
 
@@ -285,14 +285,15 @@ apollo-claude/
 ├── tests/
 │   ├── test-lib.sh                     # Shared assertion library
 │   ├── test-version-gte.sh             # version_gte() tests
-│   ├── test-statusline-formatters.sh   # format_model/percentage/cost/project_dir
+│   ├── test-statusline-formatters.sh   # format_model/percentage/cost/project_dir/reset_time/utilization
 │   ├── test-config-parsing.sh          # IFS='=' read config loop
 │   ├── test-repo-url-normalization.sh  # sed URL regex
 │   ├── test-settings-json-merge.sh     # jq merge logic (all 3 installers)
 │   ├── test-otel-headers.sh            # apollotech-otel-headers.sh end-to-end
 │   ├── test-remote-patterns.sh         # safe-bash-patterns.json deny/allow
 │   ├── test-download-validation.sh     # shebang + syntax + non-empty checks
-│   └── test-platform-detection.sh      # uname → artifact name mapping
+│   ├── test-platform-detection.sh      # uname → artifact name mapping
+│   └── test-wrapper-functions.sh      # bin/apollo-claude config-reading + _test_token
 ├── hooks/
 │   └── safe-bash/                      # Rust source for safe-bash-hook binary
 │       ├── Cargo.toml
