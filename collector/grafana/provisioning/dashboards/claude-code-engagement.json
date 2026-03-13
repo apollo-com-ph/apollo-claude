@@ -1,0 +1,67 @@
+{
+  "uid": "claude-code-engagement",
+  "title": "Claude Code - Engagement",
+  "tags": ["claude-code", "otel", "engagement"],
+  "timezone": "browser",
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "developer",
+        "label": "Developer",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "developer", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "title": "Activity Over Time",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "title": "Sessions per Day by Developer",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "count by (developer) (sum by (developer, session_id) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__interval])))",
+        "legendFormat": "{{developer}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Prompts Over Time by Developer",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__interval]))",
+        "legendFormat": "{{developer}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        }
+      }
+    }
+  ]
+}

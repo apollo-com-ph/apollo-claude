@@ -1,0 +1,116 @@
+{
+  "uid": "claude-code-models",
+  "title": "Claude Code - Model & Tokens",
+  "tags": ["claude-code", "otel", "models"],
+  "timezone": "browser",
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "developer",
+        "label": "Developer",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "developer", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      },
+      {
+        "name": "model",
+        "label": "Model",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": { "label": "model", "stream": "{service_name=\"claude-code\"}", "type": 1 },
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "title": "Model Usage",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "title": "Model Usage Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (model) (count_over_time({service_name=\"claude-code\", event_name=\"api_request\"} | model=~\"$model\" [$__interval]))",
+        "legendFormat": "{{model}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Cost by Model",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (model) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | model=~\"$model\" | unwrap cost_usd [$__range]))",
+        "legendFormat": "{{model}}"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD" }
+      }
+    },
+
+    {
+      "id": 101,
+      "title": "Token Analysis",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "panels": [],
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "title": "Token Usage Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap input_tokens [$__interval]))",
+          "legendFormat": "Input"
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap output_tokens [$__interval]))",
+          "legendFormat": "Output"
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap cache_read_tokens [$__interval]))",
+          "legendFormat": "Cache Read"
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap cache_creation_tokens [$__interval]))",
+          "legendFormat": "Cache Creation"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 10 }
+        }
+      }
+    }
+  ]
+}
