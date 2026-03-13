@@ -90,7 +90,9 @@ refresh_oauth_cache() {
     # Prevent concurrent fetches with a lockfile
     local LOCK_FILE="$HOME/.claude/statusline_oauth.lock"
     exec 9>"$LOCK_FILE"
-    flock -n 9 || return 0
+    if command -v flock >/dev/null 2>&1; then
+        flock -n 9 || return 0
+    fi
 
     # Only fetch if more than FETCH_INTERVAL_SECS since last fetch
     local LAST_FETCH=0
