@@ -59,12 +59,13 @@ pub fn spawn_background_update(hooks_dir: &Path) -> Result<(), String> {
     // The jq validation ensures we never replace the patterns file with corrupted/truncated content.
     // If jq is not installed, validation fails and the existing patterns file is preserved (safe default).
     let script = format!(
-        "curl -fsSL {} -o {} && jq empty {} 2>/dev/null && mv {} {}",
+        "curl -fsSL {} -o {} && jq empty {} 2>/dev/null && mv {} {} || rm -f {}",
         UPDATE_URL,
         shell_quote(&tmpfile),
         shell_quote(&tmpfile),
         shell_quote(&tmpfile),
         shell_quote(target.to_str().unwrap_or("")),
+        shell_quote(&tmpfile),
     );
 
     // Spawn detached via sh -c "..." &
