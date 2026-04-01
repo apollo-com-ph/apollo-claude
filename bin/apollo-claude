@@ -329,6 +329,9 @@ else
     REPO="$(basename "${PWD}")"
 fi
 
+# Sanitize repo value for safe use in HTTP headers (matches apollotech-otel-headers.sh)
+REPO="$(printf '%s' "${REPO}" | tr -cd 'a-zA-Z0-9._/-')"
+
 # ---------------------------------------------------------------------------
 # OTel environment setup
 # ---------------------------------------------------------------------------

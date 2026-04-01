@@ -41,6 +41,7 @@ limits_config:
             - event.name
             - user.email
             - developer
+            - repository
             - model
             - tool_name
             - session.id

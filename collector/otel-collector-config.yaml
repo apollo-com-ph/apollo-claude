@@ -35,13 +35,21 @@ processors:
         value: claude-code
         action: upsert
 
-  # Extract X-Apollo-Repository header into a data-point attribute (IDE plugin path).
-  # action: insert means it's a no-op if repository is already set (CLI wrapper path).
+  # Extract X-Apollo-Repository header into a record attribute (headers-helper path).
+  # action: insert means it's a no-op if repository is already set as a record attribute.
   attributes/repo-from-header:
     actions:
       - key: repository
         from_context: metadata.x-apollo-repository
         action: insert
+
+  # Fall back to resource attribute for clients that set repository via OTEL_RESOURCE_ATTRIBUTES
+  # (e.g. the CLI wrapper). Only runs if the header path above didn't already set it.
+  transform/repo-from-resource:
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["repository"], resource.attributes["repository"]) where attributes["repository"] == nil
 
   # Split each log record into its own ResourceLogs based on the specified keys,
   # then promote those keys to resource-level attributes so Loki indexes them as labels.
@@ -52,6 +60,7 @@ processors:
       - event.name
       - user.email
       - developer
+      - repository
       - model
       - tool_name
       - session.id
@@ -96,7 +105,7 @@ service:
   pipelines:
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resource, attributes/repo-from-header, groupbyattrs, attributes, batch]
+      processors: [memory_limiter, resource, attributes/repo-from-header, transform/repo-from-resource, groupbyattrs, attributes, batch]
       exporters: [otlp_http/loki]
 
   telemetry:
