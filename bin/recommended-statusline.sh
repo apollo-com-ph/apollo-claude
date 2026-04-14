@@ -9,7 +9,7 @@ set -euo pipefail
 # to test: bash statusline_test.sh
 
 ## Constants
-FETCH_INTERVAL_SECS=480    # 8 minutes between OAuth API fetches
+FETCH_INTERVAL_SECS=600    # 10 minutes between OAuth API fetches
 SUSTAINABLE_RATE=14.28     # 100/7 — daily sustainable usage rate (%)
 
 ## Logging setup
@@ -102,6 +102,18 @@ refresh_oauth_cache() {
 
     local CURRENT_TIME
     CURRENT_TIME=$(date +%s)
+
+    # Check dedicated backoff_until field first (set on real HTTP errors / 429s).
+    # This is separate from fetched_at so TTL freshness math stays correct.
+    local BACKOFF_UNTIL=0
+    if [ -f "$USAGE_CACHE_FILE" ]; then
+        BACKOFF_UNTIL=$(jq -r '.backoff_until // 0' "$USAGE_CACHE_FILE" 2>/dev/null || echo 0)
+    fi
+    if [ "$BACKOFF_UNTIL" -gt "$CURRENT_TIME" ] 2>/dev/null; then
+        debug_log "OAuth background fetch: skipping, backoff active for $((BACKOFF_UNTIL - CURRENT_TIME))s"
+        return 0
+    fi
+
     local TIME_SINCE_FETCH=$((CURRENT_TIME - LAST_FETCH))
 
     if [ "$TIME_SINCE_FETCH" -lt "$FETCH_INTERVAL_SECS" ]; then
@@ -144,9 +156,9 @@ refresh_oauth_cache() {
         return 0
     fi
 
-    # Fetch usage data (2s timeout, capture headers for Retry-After)
+    # Fetch usage data (5s timeout, capture headers for Retry-After)
     local USAGE_RAW USAGE_HTTP_CODE USAGE_RESPONSE RETRY_AFTER
-    USAGE_RAW=$(curl -si --connect-timeout 2 --max-time 2 -w "\n%{http_code}" \
+    USAGE_RAW=$(curl -si --connect-timeout 3 --max-time 5 -w "\n%{http_code}" \
         "https://api.anthropic.com/api/oauth/usage" \
         -H "Authorization: Bearer $ACCESS_TOKEN" \
         -H "Content-Type: application/json" \
@@ -186,6 +198,7 @@ refresh_oauth_cache() {
             --arg five_hour_resets "$FIVE_HOUR_RESETS" \
             '{
                 fetched_at: $fetched_at,
+                backoff_until: 0,
                 seven_day_utilization: $seven_day_util,
                 seven_day_resets_at: (if $seven_day_resets == "null" then null else $seven_day_resets end),
                 five_hour_utilization: $five_hour_util,
@@ -194,40 +207,79 @@ refresh_oauth_cache() {
         )"
         debug_log "OAuth background fetch: success (7d=${SEVEN_DAY_UTIL}%, 5h=${FIVE_HOUR_UTIL}%)"
     else
-        # On API error: preserve existing utilization data, but push fetched_at forward
-        # so we don't retry until the rate limit window expires (Retry-After header).
-        local NEXT_FETCH_AT="$CURRENT_TIME"
+        # HTTP 200 failed. Three cases to distinguish:
+        #   (a) curl network failure  → USAGE_HTTP_CODE empty → do NOT touch cache (retry next tick)
+        #   (b) HTTP 429 w/ Retry-After → set backoff_until = now + RETRY_AFTER + FETCH_INTERVAL_SECS
+        #   (c) other HTTP error       → set backoff_until = now + 60s (short cooldown)
+        # Crucially: we never modify fetched_at here — that field stays as the real last-success
+        # time so try_cache TTL math in check-usage.sh reflects actual freshness.
+        if [ -z "$USAGE_HTTP_CODE" ]; then
+            log "WARN  ⚠️  OAuth background fetch: curl failed (no HTTP response) — cache left untouched"
+            return 0
+        fi
+
+        local BACKOFF_UNTIL
         if [ -n "$RETRY_AFTER" ] && echo "$RETRY_AFTER" | grep -qE '^[0-9]+$' && [ "$RETRY_AFTER" -gt 0 ]; then
-            # Schedule next fetch for exactly when the rate limit window clears
-            NEXT_FETCH_AT=$((CURRENT_TIME + RETRY_AFTER - FETCH_INTERVAL_SECS))
-            log "WARN  ⚠️  OAuth background fetch: usage HTTP $USAGE_HTTP_CODE — retry-after ${RETRY_AFTER}s, next fetch in $((NEXT_FETCH_AT - CURRENT_TIME + FETCH_INTERVAL_SECS))s"
+            # Preserve the full grace period: wait for the rate limit window plus one fetch interval
+            BACKOFF_UNTIL=$((CURRENT_TIME + RETRY_AFTER + FETCH_INTERVAL_SECS))
+            log "WARN  ⚠️  OAuth background fetch: HTTP $USAGE_HTTP_CODE — retry-after ${RETRY_AFTER}s, backoff for $((BACKOFF_UNTIL - CURRENT_TIME))s"
         else
-            log "WARN  ⚠️  OAuth background fetch: usage HTTP $USAGE_HTTP_CODE"
+            BACKOFF_UNTIL=$((CURRENT_TIME + 60))
+            log "WARN  ⚠️  OAuth background fetch: HTTP $USAGE_HTTP_CODE (no Retry-After) — 60s cooldown"
         fi
         if [ -f "$USAGE_CACHE_FILE" ]; then
             local _existing
-            _existing=$(jq --argjson now "$NEXT_FETCH_AT" '.fetched_at = $now' "$USAGE_CACHE_FILE" 2>/dev/null) \
+            _existing=$(jq --argjson bu "$BACKOFF_UNTIL" '.backoff_until = $bu' "$USAGE_CACHE_FILE" 2>/dev/null) \
                 && atomic_write_file "$USAGE_CACHE_FILE" "$_existing"
         fi
     fi
 }
 
-# Run OAuth fetch in background — does not block statusline output
-refresh_oauth_cache 2>>"$LOG_FILE" &
-
-## Extract session metrics from input JSON
+## Extract session metrics and rate_limits from stdin JSON
 # MODEL: Model name
 # USED_PCT: Context window usage percentage
 # COST_USD: Session/project cost in USD
 # PROJECT_DIR: Project directory
-{ read -r MODEL; read -r USED_PCT; read -r COST_USD; read -r PROJECT_DIR; } < <(
+# STDIN_5H_UTIL, STDIN_5H_RESETS: 5h rate limit from stdin (resets_at as ISO-8601)
+# STDIN_7D_UTIL, STDIN_7D_RESETS: 7d rate limit from stdin (resets_at as ISO-8601)
+{ read -r MODEL; read -r USED_PCT; read -r COST_USD; read -r PROJECT_DIR;
+  read -r STDIN_5H_UTIL; read -r STDIN_5H_RESETS;
+  read -r STDIN_7D_UTIL; read -r STDIN_7D_RESETS; } < <(
     jq -r '
         (.model.display_name // .model.id // "Unknown"),
         (.context_window.used_percentage // 0),
         (.cost.total_cost_usd // 0),
-        (.workspace.project_dir // "")
+        (.workspace.project_dir // ""),
+        (.rate_limits.five_hour.used_percentage // "null"),
+        (if .rate_limits.five_hour.resets_at then (.rate_limits.five_hour.resets_at | todate) else "null" end),
+        (.rate_limits.seven_day.used_percentage // "null"),
+        (if .rate_limits.seven_day.resets_at then (.rate_limits.seven_day.resets_at | todate) else "null" end)
     ' <<< "$INPUT"
 )
+
+# Prefer stdin rate_limits (live, no API call needed) over OAuth fetch.
+# Falls back to OAuth fetch only when stdin lacks rate_limits (older Claude Code versions).
+if [ "$STDIN_5H_UTIL" != "null" ] && [ -n "$STDIN_5H_UTIL" ]; then
+    debug_log "Using stdin rate_limits (5h=${STDIN_5H_UTIL}% 7d=${STDIN_7D_UTIL}%), skipping OAuth fetch"
+    atomic_write_file "$USAGE_CACHE_FILE" "$(jq -n \
+        --argjson fetched_at "$(date +%s)" \
+        --argjson five_hour_util "$STDIN_5H_UTIL" \
+        --arg five_hour_resets "$STDIN_5H_RESETS" \
+        --argjson seven_day_util "$STDIN_7D_UTIL" \
+        --arg seven_day_resets "$STDIN_7D_RESETS" \
+        '{
+            fetched_at: $fetched_at,
+            backoff_until: 0,
+            seven_day_utilization: $seven_day_util,
+            seven_day_resets_at: (if $seven_day_resets == "null" then null else $seven_day_resets end),
+            five_hour_utilization: $five_hour_util,
+            five_hour_resets_at: (if $five_hour_resets == "null" then null else $five_hour_resets end)
+        }'
+    )"
+else
+    # Fallback: older Claude Code variants without stdin rate_limits
+    refresh_oauth_cache 2>>"$LOG_FILE" &
+fi
 
 ## format_model(model)
 # Formats model name to 10 characters, right-padded.
