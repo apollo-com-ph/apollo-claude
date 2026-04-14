@@ -11,6 +11,8 @@ set -euo pipefail
 ## Constants
 FETCH_INTERVAL_SECS=600    # 10 minutes between OAuth API fetches
 SUSTAINABLE_RATE=14.28     # 100/7 — daily sustainable usage rate (%)
+DEBOUNCE_SECS=2            # skip recompute if last output is younger than this
+OUTPUT_CACHE_PREFIX="/tmp/statusline_output_cache"
 
 ## Logging setup
 # LOG_FILE: Path to log file
@@ -80,6 +82,28 @@ if ! jq -e . <<< "$INPUT" > /dev/null 2>&1; then
     echo "[Unknown   ]00%/\$0.0 (-- -----)"
     exit 0
 fi
+
+## Debounce: if a fresh cached output exists for this project, echo it and exit.
+# Keyed on workspace.project_dir so concurrent Claude Code sessions in different
+# projects do not share state. Stale/torn cache reads fall through to a full
+# recompute — safe fallback, no correctness risk.
+_dbnc_project_dir=$(jq -r '.workspace.project_dir // ""' <<< "$INPUT")
+_dbnc_key=$(printf '%s' "$_dbnc_project_dir" | cksum | awk '{print $1}')
+OUTPUT_CACHE_FILE="${OUTPUT_CACHE_PREFIX}.${_dbnc_key}"
+_dbnc_now=$(date +%s)
+if [ -f "$OUTPUT_CACHE_FILE" ]; then
+    _dbnc_cached_ts=$(head -n 1 "$OUTPUT_CACHE_FILE" 2>/dev/null || echo 0)
+    _dbnc_cached_out=$(tail -n +2 "$OUTPUT_CACHE_FILE" 2>/dev/null || echo "")
+    # Guard: ts must be a non-negative integer before arithmetic
+    if echo "$_dbnc_cached_ts" | grep -qE '^[0-9]+$' \
+       && [ -n "$_dbnc_cached_out" ] \
+       && [ "$((_dbnc_now - _dbnc_cached_ts))" -lt "$DEBOUNCE_SECS" ]; then
+        debug_log "Debounce hit: echoing cached output (age $((_dbnc_now - _dbnc_cached_ts))s, key=$_dbnc_key)"
+        printf '%s\n' "$_dbnc_cached_out"
+        exit 0
+    fi
+fi
+debug_log "Debounce miss: key=$_dbnc_key — running full render"
 
 ###############################################################################
 # refresh_oauth_cache()
@@ -466,6 +490,12 @@ debug_log "Formatted metrics: MODEL_FMT=$MODEL_FMT PCT_FMT=$PCT_FMT COST_FMT=$CO
 STATUSLINE_OUTPUT="[${MODEL_FMT}]${PCT_FMT}/${COST_FMT} ${UTIL_FMT} ${PROJECT_FMT}"
 echo "$STATUSLINE_OUTPUT"
 debug_log "Output: $STATUSLINE_OUTPUT"
+
+# Write the output cache used by the debounce block at the top of the script.
+# Plain redirect is intentional: this file is a short-lived hint, not critical
+# state. A torn write during a burst race just forces the next invocation to
+# do a full recompute, which is the safe fallback.
+printf '%s\n%s\n' "$_dbnc_now" "$STATUSLINE_OUTPUT" > "$OUTPUT_CACHE_FILE" 2>/dev/null || true
 
 # Also save structured JSON to /tmp/statusline.json for external consumption.
 # Reuses cache values already extracted by format_utilization() via globals.
