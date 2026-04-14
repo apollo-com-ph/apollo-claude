@@ -3,115 +3,26 @@
   "title": "Claude Code Overview",
   "tags": ["claude-code", "otel", "overview"],
   "timezone": "browser",
-  "refresh": "5m",
+  "refresh": "30m",
   "schemaVersion": 39,
   "time": { "from": "now-7d", "to": "now" },
-  "templating": {
-    "list": [
-      {
-        "name": "developer",
-        "label": "Developer",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": { "label": "developer", "stream": "{service_name=\"claude-code\"}", "type": 1 },
-        "includeAll": true,
-        "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
-        "refresh": 2,
-        "multi": true
-      },
-      {
-        "name": "model",
-        "label": "Model",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": { "label": "model", "stream": "{service_name=\"claude-code\"}", "type": 1 },
-        "includeAll": true,
-        "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
-        "refresh": 2,
-        "multi": true
-      }
-    ]
-  },
+  "templating": { "list": [] },
   "panels": [
-    {
-      "id": 100,
-      "title": "KPIs",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "panels": [],
-      "collapsed": false
-    },
     {
       "id": 1,
       "title": "Active Developers Today",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "count(count by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [24h])))",
+        "expr": "count(count by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\".+\" [24h])))",
         "legendFormat": "Developers",
         "queryType": "instant"
       }],
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
-          "thresholds": { "steps": [{ "color": "green", "value": null }] }
-        }
-      }
-    },
-    {
-      "id": 2,
-      "title": "Active Developers This Week",
-      "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "count(count by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [7d])))",
-        "legendFormat": "Developers",
-        "queryType": "instant"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "thresholds": { "steps": [{ "color": "green", "value": null }] }
-        }
-      }
-    },
-    {
-      "id": 3,
-      "title": "Total Sessions",
-      "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "count(sum by (session_id) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__range])))",
-        "legendFormat": "Sessions",
-        "queryType": "instant"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "thresholds": { "steps": [{ "color": "blue", "value": null }] }
-        }
-      }
-    },
-    {
-      "id": 4,
-      "title": "Total Prompts",
-      "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__range]))",
-        "legendFormat": "Prompts",
-        "queryType": "instant"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "thresholds": { "steps": [{ "color": "purple", "value": null }] }
+          "thresholds": { "steps": [{ "color": "#5794F2", "value": null }] }
         }
       }
     },
@@ -119,10 +30,10 @@
       "id": 5,
       "title": "Total Cost (USD)",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 6 },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap cost_usd [$__range]))",
+        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap cost_usd [$__range]))",
         "legendFormat": "Cost",
         "queryType": "instant"
       }],
@@ -130,13 +41,7 @@
         "defaults": {
           "unit": "currencyUSD",
           "decimals": 2,
-          "thresholds": {
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "red", "value": 50 }
-            ]
-          }
+          "thresholds": { "steps": [{ "color": "#F2495C", "value": null }] }
         }
       }
     },
@@ -144,10 +49,10 @@
       "id": 8,
       "title": "Total Tokens",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 6 },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap input_tokens [$__range])) + sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap output_tokens [$__range]))",
+        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap input_tokens [$__range])) + sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap output_tokens [$__range]))",
         "legendFormat": "Tokens",
         "queryType": "instant"
       }],
@@ -156,92 +61,136 @@
           "noValue": "0",
           "unit": "short",
           "decimals": 0,
-          "thresholds": { "steps": [{ "color": "orange", "value": null }] }
+          "thresholds": { "steps": [{ "color": "#FF9830", "value": null }] }
         }
       }
     },
     {
       "id": 6,
-      "title": "Active Repositories",
+      "title": "Active Repositories Today",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 6 },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "count(sum by (repository) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__range])))",
+        "expr": "count(sum by (repository) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\".+\" [24h])))",
         "legendFormat": "Repositories",
         "queryType": "instant"
       }],
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
-          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+          "thresholds": { "steps": [{ "color": "#73BF69", "value": null }] }
         }
       }
-    },
-    {
-      "id": 7,
-      "title": "Avg Prompts / Session",
-      "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 6 },
-      "datasource": { "type": "loki", "uid": "loki" },
-      "targets": [{
-        "expr": "sum(count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__range])) / count(sum by (session_id) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [$__range])))",
-        "legendFormat": "Prompts/Session",
-        "queryType": "instant"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "decimals": 1,
-          "thresholds": {
-            "steps": [
-              { "color": "blue", "value": null },
-              { "color": "green", "value": 5 },
-              { "color": "super-light-green", "value": 15 }
-            ]
-          }
-        }
-      }
-    },
-
-    {
-      "id": 101,
-      "title": "Adoption",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
-      "panels": [],
-      "collapsed": false
     },
     {
       "id": 10,
       "title": "Daily Active Developers",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "type": "barchart",
+      "timeFrom": "14d",
+      "maxDataPoints": 14,
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "count(sum by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [1d])))",
+        "expr": "count(sum by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\".+\" [1d])))",
         "legendFormat": "Active Developers"
       }],
       "fieldConfig": {
         "defaults": {
-          "custom": { "fillOpacity": 15 }
+          "color": { "mode": "fixed", "fixedColor": "#5794F2" }
         }
+      },
+      "options": {
+        "barWidth": 0.6,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "text": { "valueSize": 8 }
       }
     },
     {
       "id": 12,
-      "title": "Active Repositories Over Time",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "title": "Daily Active Repositories",
+      "type": "barchart",
+      "timeFrom": "14d",
+      "maxDataPoints": 14,
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "count(sum by (repository) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" [1d])))",
+        "expr": "count(sum by (repository) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\".+\" [1d])))",
         "legendFormat": "Active Repositories"
       }],
       "fieldConfig": {
         "defaults": {
-          "custom": { "fillOpacity": 15 }
+          "color": { "mode": "fixed", "fixedColor": "#73BF69" }
         }
+      },
+      "options": {
+        "barWidth": 0.6,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "text": { "valueSize": 8 }
+      }
+    },
+
+    {
+      "id": 37,
+      "title": "Daily Cost (USD)",
+      "type": "barchart",
+      "timeFrom": "14d",
+      "maxDataPoints": 14,
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap cost_usd [1d]))",
+        "legendFormat": "Cost"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#F2495C" },
+          "unit": "currencyUSD",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "barWidth": 0.6,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "text": { "valueSize": 8 }
+      }
+    },
+
+    {
+      "id": 36,
+      "title": "Daily Tokens",
+      "type": "barchart",
+      "timeFrom": "14d",
+      "maxDataPoints": 14,
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap input_tokens [1d])) + sum(sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap output_tokens [1d]))",
+        "legendFormat": "Tokens"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#FF9830" },
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "barWidth": 0.6,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "text": { "valueSize": 8 }
       }
     },
 
@@ -249,10 +198,10 @@
       "id": 35,
       "title": "Prompts Without Repository (check OTEL setup)",
       "type": "table",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 40 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 44 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "sum by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\"$developer\" | repository = \"\" [$__range]))",
+        "expr": "sum by (developer) (count_over_time({service_name=\"claude-code\", event_name=\"user_prompt\"} | developer=~\".+\" | repository = \"\" [$__range]))",
         "legendFormat": "{{developer}}"
       }],
       "transformations": [
@@ -280,10 +229,10 @@
       "id": 31,
       "title": "Tokens by Developer",
       "type": "table",
-      "gridPos": { "h": 20, "w": 12, "x": 0, "y": 20 },
+      "gridPos": { "h": 20, "w": 12, "x": 0, "y": 24 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "sum by (developer) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap input_tokens [$__range])) + sum by (developer) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap output_tokens [$__range]))",
+        "expr": "sum by (developer) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap input_tokens [$__range])) + sum by (developer) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap output_tokens [$__range]))",
         "legendFormat": "{{developer}}"
       }],
       "transformations": [
@@ -322,10 +271,10 @@
       "id": 33,
       "title": "Tokens by Repository",
       "type": "table",
-      "gridPos": { "h": 20, "w": 12, "x": 12, "y": 20 },
+      "gridPos": { "h": 20, "w": 12, "x": 12, "y": 24 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
-        "expr": "sum by (repository) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap input_tokens [$__range])) + sum by (repository) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\"$developer\" | model=~\"$model\" | unwrap output_tokens [$__range]))",
+        "expr": "sum by (repository) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap input_tokens [$__range])) + sum by (repository) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | developer=~\".+\" | model=~\".+\" | unwrap output_tokens [$__range]))",
         "legendFormat": "{{repository}}"
       }],
       "transformations": [
