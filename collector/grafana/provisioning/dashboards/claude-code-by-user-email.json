@@ -103,10 +103,39 @@
     },
 
     {
+      "id": 4,
+      "title": "Cost by User",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap cost_usd [$__range]))",
+        "legendFormat": "{{user_email}}"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD" }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Tokens by User",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{
+        "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap input_tokens [$__range])) + sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap output_tokens [$__range]))",
+        "legendFormat": "{{user_email}}"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0 }
+      }
+    },
+
+    {
       "id": 101,
       "title": "Cost",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
       "panels": [],
       "collapsed": false
     },
@@ -114,7 +143,7 @@
       "id": 10,
       "title": "Cost Over Time by User",
       "type": "timeseries",
-      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 7 },
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 15 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
         "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap cost_usd [$__interval]))",
@@ -131,7 +160,7 @@
       "id": 11,
       "title": "Cost by User",
       "type": "table",
-      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 7 },
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 15 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
         "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap cost_usd [$__range]))",
@@ -174,7 +203,7 @@
       "id": 102,
       "title": "Tokens",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
       "panels": [],
       "collapsed": false
     },
@@ -182,7 +211,7 @@
       "id": 20,
       "title": "Tokens Over Time by User",
       "type": "timeseries",
-      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 17 },
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 25 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
         "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap input_tokens [$__interval])) + sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap output_tokens [$__interval]))",
@@ -200,7 +229,7 @@
       "id": 21,
       "title": "Tokens by User",
       "type": "table",
-      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 17 },
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 25 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [{
         "expr": "sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap input_tokens [$__range])) + sum by (user_email) (sum_over_time({service_name=\"claude-code\"} | event_name=\"api_request\" | user_email=~\"$user_email\" | unwrap output_tokens [$__range]))",
