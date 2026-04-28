@@ -236,6 +236,22 @@ The hook loads additional patterns from `~/.claude/hooks/safe-bash-patterns.json
 
 `allow` patterns override `deny` patterns in the config file, but **cannot override the hardcoded patterns** built into the binary (those are always enforced).
 
+## Optional: Statusline
+
+`install-statusline.sh` installs a Claude Code statusline that shows your current model, context-window usage, session cost, the time remaining in your 5-hour OAuth quota, and the project directory. Output looks like:
+
+    [Sonnet 4.6]42%/$1.23 (58% 4h32m) parent/project
+
+`42%` is context-window usage, `$1.23` is session cost, and `(58% 4h32m)` is the percentage of your 5-hour quota remaining and the time until it resets. If your 7-day burn rate exceeds the sustainable pace, a warning suffix like ` !23% 5d12h!` is appended.
+
+On newer Claude Code versions, rate-limit data comes directly from the session JSON. On older versions the script falls back to the Anthropic OAuth API (cached 10 minutes, `flock`-protected on Linux).
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/apollo-com-ph/apollo-claude/main/install-statusline.sh | bash
+```
+
+The installer downloads `bin/recommended-statusline.sh` to `~/.claude/hooks/statusline.sh` and merges the `statusLine` config into `~/.claude/settings.json`. Restart Claude Code after installing. The script also writes `/tmp/statusline.json` for external consumption.
+
 ## Optional: CLI wrapper
 
 `install-apollo-claude-wrapper.sh` installs `apollo-claude`, a thin bash wrapper that also injects telemetry but with auth isolation — it stores Claude credentials in `~/.apollo-claude/` separately from `~/.claude/`, and includes an auto-update mechanism. Most developers don't need this; use it only if you need a separate Claude auth session (e.g. a team subscription billed separately from personal usage).
